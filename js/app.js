@@ -5,6 +5,7 @@ import { TYPES, loadData, dailyAvailable, wrongAvailable, unreleasedCount } from
 import { allWords } from './words.js';
 import { renderQuizHome } from './quiz.js';
 import { renderVocab } from './vocab.js';
+import { initSelectionBar, refreshSelectionBar } from './select.js';
 
 const TITLES = { home: 'JLPT N2 공부방', quiz: '문제 풀이', vocab: '단어 오답노트', settings: '설정' };
 
@@ -91,7 +92,7 @@ async function renderSettings(view) {
       h('h3', {}, '문제 풀'), h('div', { class: 'sub' }, poolInfo)),
     h('div', { class: 'card' },
       h('h3', {}, '백업'),
-      h('div', { class: 'sub' }, `학습 기록과 단어는 이 기기 브라우저에 저장돼요. 주기적으로 내보내기를 해 두세요. 저장 영구 보호: ${persisted ? '켜짐' : '꺼짐(홈 화면에 설치하면 안전해져요)'}`),
+      h('div', { class: 'sub' }, `학습 기록, 단어, 저장한 nihongokanji 주소는 이 기기 브라우저에 저장돼요. 주기적으로 내보내기를 해 두세요. 저장 영구 보호: ${persisted ? '켜짐' : '꺼짐(홈 화면에 설치하면 안전해져요)'}`),
       h('div', { class: 'row', style: 'margin-top:8px' },
         h('button', { class: 'btn', onclick: async () => {
           const blob = new Blob([JSON.stringify(await exportAll(), null, 2)], { type: 'application/json' });
@@ -112,6 +113,8 @@ async function route() {
   const name = location.hash.replace(/^#\/?/, '').split('/')[0] || 'home';
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === name));
   $('#title').textContent = TITLES[name] || TITLES.home;
+  document.body.dataset.route = name; // 글자 선택 바는 문제 화면에서만 동작
+  refreshSelectionBar();
   const view = $('#view');
   try {
     if (name === 'quiz') await renderQuizHome(view);
@@ -132,6 +135,7 @@ window.addEventListener('hashchange', route);
 
 (async () => {
   await applySettings();
+  initSelectionBar();
   requestPersistence();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   route();

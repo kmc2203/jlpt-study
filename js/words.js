@@ -6,6 +6,13 @@ export const allWords = () => load('words');
 
 const norm = s => String(s ?? '').trim();
 
+// 한자 한 글자씩 (々 는 한자가 아니라 반복 기호이므로 제외). 중복은 한 번만, 등장 순서 유지.
+const KANJI_RE = /[㐀-䶿一-鿿豈-﫿]/g;
+export const kanjiOf = s => [...new Set(String(s ?? '').match(KANJI_RE) || [])];
+
+// '미완성' = 뜻이 없거나, 한자가 들어 있는데 읽기가 없는 단어
+export const isIncomplete = w => !norm(w.meaning) || (kanjiOf(w.word).length > 0 && !norm(w.reading));
+
 export async function findWord(word, reading = '') {
   const words = await allWords();
   const w = norm(word), r = norm(reading);

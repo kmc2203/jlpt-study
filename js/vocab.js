@@ -1,11 +1,13 @@
 // 단어 오답노트 화면: 학습(사이클) / 목록 / 추가
 import { h, toast, openModal } from './util.js';
 import { load, commit } from './storage.js';
-import { allWords, addWord, updateWord, removeWord, recordSeen, parseBulk } from './words.js';
+import { allWords, addWord, updateWord, removeWord, recordSeen, parseBulk, isIncomplete } from './words.js';
 import { newCycle, answer, retryRound, summary, CYCLE_SIZE } from './cycle.js';
+import { kanjiChips } from './kanji.js';
 
 let tab = 'study';
 let revealed = false;
+let listFilter = 'all'; // 'all' | 'todo'(미완성)
 
 /* ───────── 단어 추가/수정 모달 (문제 화면에서도 사용) ───────── */
 export function openWordModal(prefill = {}, onSaved) {
@@ -14,8 +16,9 @@ export function openWordModal(prefill = {}, onSaved) {
   const meaning = h('input', { type: 'text', value: prefill.meaning || '', placeholder: '납부하다' });
   const body = h('div', {},
     h('label', { class: 'f' }, '단어 / 한자 / 표현'), word,
-    h('label', { class: 'f' }, '읽기'), reading,
-    h('label', { class: 'f' }, '뜻'), meaning);
+    h('label', { class: 'f' }, '읽기 (선택)'), reading,
+    h('label', { class: 'f' }, '뜻 (선택)'), meaning,
+    prefill.id ? null : h('div', { class: 'sub', style: 'margin-top:8px' }, '읽기와 뜻은 비워 둬도 돼요. 비어 있으면 「미완성」으로 표시되고, 나중에 채울 수 있어요.'));
   openModal(prefill.id ? '단어 수정' : '단어 오답노트에 추가', body, [
     { label: '취소' },
     { label: '저장', cls: 'primary', onClick: async () => {
@@ -85,8 +88,10 @@ async function renderStudy(body, words, view) {
         h('h2', {}, cycle.round > 1 ? `${cycle.round}차 완료` : '사이클 완료'),
         h('div', { class: 'big' }, `알아요 ${s.known} · 몰라요 ${s.unknown}`),
         unknownWords.length ? h('div', { class: 'words', style: 'margin-top:10px' }, ...unknownWords.map(w =>
-          h('div', { class: 'word' }, h('span', { class: 'w jp' }, w.word),
-            h('span', { class: 'info' }, [w.reading, w.meaning].filter(Boolean).join(' · '))))) : h('div', { class: 'sub', style: 'margin-top:6px' }, '모두 알고 있었어요 🎉')),
+          h('div', { class: 'word' },
+            h('div', { class: 'info' },
+              h('div', {}, h('span', { class: 'w jp' }, w.word), '  ', h('span', { class: 'sub' }, [w.reading, w.meaning].filter(Boolean).join(' · ') || '(읽기·뜻 미입력)')),
+              kanjiChips(w.word))))) : h('div', { class: 'sub', style: 'margin-top:6px' }, '모두 알고 있었어요 🎉')),
       h('div', { class: 'actions' },
         h('button', { class: 'btn', disabled: !unknownWords.length, onclick: async () => {
           await commit('cycle', retryRound(cycle)); revealed = false; renderVocab(view);
@@ -101,11 +106,19 @@ async function renderStudy(body, words, view) {
   const card = h('div', { class: 'card vcard', onclick: () => { revealed = !revealed; fill(); } });
   const fill = () => {
     card.replaceChildren(h('div', { class: 'word-big' }, w.word));
+    const chips = kanjiChips(w.word); // 한자 한 글자씩 nihongokanji 연결
+    if (chips) card.append(chips);
     if (revealed) {
       if (w.reading) card.append(h('div', { class: 'reading jp' }, w.reading));
-      card.append(h('div', { class: 'meaning' }, w.meaning || '(뜻 없음)'));
+      card.append(w.meaning ? h('div', { class: 'meaning' }, w.meaning) : h('div', { class: 'meaning sub' }, '(뜻을 아직 입력하지 않았어요)'));
       if (w.memo) card.append(h('div', { class: 'hint' }, w.memo));
-    } else card.append(h('div', { class: 'hint' }, '카드를 누르면 읽기·뜻이 보여요'));
+      if (isIncomplete(w)) card.append(h('button', {
+        class: 'btn small',
+        onclick: e => { e.stopPropagation(); openWordModal({ id: w.id, ...w }, () => renderVocab(view)); },
+      }, '✏️ 읽기·뜻 입력하기'));
+    } else card.append(h('div', { class: 'hint' }, isIncomplete(w)
+      ? '카드를 누르면 입력된 정보가 보여요 (미완성 단어)'
+      : '카드를 누르면 읽기·뜻이 보여요'));
   };
   fill();
 
@@ -132,47 +145,59 @@ async function renderStudy(body, words, view) {
 function renderList(body, words, view) {
   const list = h('div', { class: 'words' });
   const search = h('input', { type: 'text', placeholder: '검색 (단어·읽기·뜻)' });
+  const todoCount = words.filter(isIncomplete).length;
+  const filters = h('div', { class: 'seg' }, ...[['all', `전체 ${words.length}`], ['todo', `미완성 ${todoCount}`]].map(([k, l]) =>
+    h('button', { class: listFilter === k ? 'on' : '', onclick: () => { listFilter = k; renderVocab(view); } }, l)));
   const draw = () => {
     const q = search.value.trim().toLowerCase();
     const rows = [...words].sort((a, b) => b.addedAt - a.addedAt)
+      .filter(w => listFilter !== 'todo' || isIncomplete(w))
       .filter(w => !q || [w.word, w.reading, w.meaning].some(s => (s || '').toLowerCase().includes(q)));
     list.replaceChildren(...(rows.length ? rows.map(w => h('div', { class: 'word' },
       h('div', { class: 'info' },
-        h('div', {}, h('span', { class: 'w jp' }, w.word), w.reading ? h('span', { class: 'sub jp' }, `  ${w.reading}`) : null),
-        h('div', {}, w.meaning || '(뜻 없음)'),
+        h('div', {}, h('span', { class: 'w jp' }, w.word), w.reading ? h('span', { class: 'sub jp' }, `  ${w.reading}`) : null,
+          isIncomplete(w) ? h('span', { class: 'badge' }, '미완성') : null),
+        w.meaning ? h('div', {}, w.meaning) : h('div', { class: 'sub' }, '(뜻 없음)'),
+        kanjiChips(w.word),
         h('div', { class: 'sub' }, `본 횟수 ${w.seen || 0} · 몰라요 ${w.miss || 0}`)),
       h('button', { class: 'btn small', onclick: () => openWordModal({ id: w.id, ...w }, () => renderVocab(view)) }, '✏️'),
       h('button', { class: 'btn small', onclick: async () => {
         if (!confirm(`'${w.word}' 을(를) 삭제할까요?`)) return;
         await removeWord(w.id); renderVocab(view);
-      } }, '🗑'))) : [h('div', { class: 'empty' }, '결과가 없어요')]));
+      } }, '🗑'))) : [h('div', { class: 'empty' }, listFilter === 'todo' ? '미완성 단어가 없어요 👍' : '결과가 없어요')]));
   };
   search.addEventListener('input', draw);
-  body.append(h('div', { class: 'card' }, search), list);
+  body.append(filters, h('div', { class: 'card' }, search), list);
   draw();
 }
 
 /* ───────── 추가 ───────── */
 function renderAdd(body, view) {
   const word = h('input', { type: 'text', placeholder: '単語 / 漢字 / 表現' });
-  const reading = h('input', { type: 'text', placeholder: '읽기 (선택)' });
+  const reading = h('input', { type: 'text', placeholder: '읽기' });
   const meaning = h('input', { type: 'text', placeholder: '뜻' });
-  const memo = h('input', { type: 'text', placeholder: '메모 (선택)' });
-  const bulk = h('textarea', { placeholder: '한 줄에 하나씩\n納める, おさめる, 납부하다\n更新\tこうしん\t갱신' });
+  const memo = h('input', { type: 'text', placeholder: '메모' });
+  const bulk = h('textarea', { placeholder: '한 줄에 하나씩\n納める\n更新, こうしん, 갱신\n提供\tていきょう\t제공' });
+  const gap = () => h('div', { style: 'height:6px' });
+
+  const submit = async () => {
+    if (!word.value.trim()) return toast('단어를 입력해 주세요');
+    const r = await addWord({ word: word.value, reading: reading.value, meaning: meaning.value, memo: memo.value });
+    toast(!r.added ? '이미 저장된 단어예요' : isIncomplete(r.word) ? '추가했어요 (미완성으로 표시돼요)' : '추가했어요');
+    if (r.added) { word.value = reading.value = meaning.value = memo.value = ''; word.focus(); }
+  };
+  word.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
 
   body.append(
     h('div', { class: 'card' },
-      h('h3', {}, '한 개 추가'),
-      word, h('div', { style: 'height:6px' }), reading, h('div', { style: 'height:6px' }), meaning, h('div', { style: 'height:6px' }), memo,
-      h('div', { class: 'row end' }, h('button', { class: 'btn primary', onclick: async () => {
-        if (!word.value.trim()) return toast('단어를 입력해 주세요');
-        const r = await addWord({ word: word.value, reading: reading.value, meaning: meaning.value, memo: memo.value });
-        toast(r.added ? '추가했어요' : '이미 저장된 단어예요');
-        if (r.added) { word.value = reading.value = meaning.value = memo.value = ''; word.focus(); }
-      } }, '추가'))),
+      h('h3', {}, '단어 추가'),
+      h('div', { class: 'sub', style: 'margin-bottom:8px' }, '모르는 단어나 한자만 입력해도 돼요. 읽기와 뜻이 비어 있으면 「미완성」으로 표시되고, 목록에서 모아 볼 수 있어요.'),
+      word,
+      h('details', {}, h('summary', {}, '읽기·뜻·메모도 입력하기 (선택)'), gap(), reading, gap(), meaning, gap(), memo),
+      h('div', { class: 'row end' }, h('button', { class: 'btn primary', onclick: submit }, '추가'))),
     h('div', { class: 'card' },
       h('h3', {}, '여러 개 한 번에 추가'),
-      h('div', { class: 'sub' }, '형식: 「単語, よみ, 뜻」 또는 탭/| 로 구분. PC에서 엑셀·메모장 내용을 그대로 붙여넣을 수 있어요. 이미 있는 단어는 건너뜁니다.'),
+      h('div', { class: 'sub' }, '한 줄에 하나씩. 「単語」만 써도 되고, 「単語, よみ, 뜻」 또는 탭/| 로 구분해도 돼요. PC에서 엑셀·메모장 내용을 그대로 붙여넣을 수 있어요. 이미 있는 단어는 건너뜁니다.'),
       bulk,
       h('div', { class: 'row end' }, h('button', { class: 'btn primary', onclick: async () => {
         const rows = parseBulk(bulk.value);

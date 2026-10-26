@@ -26,6 +26,9 @@ async function setup() {
       } catch { return { ok: false, status: 404 }; }
     },
   });
+  // 테스트끼리 저장 데이터가 섞이지 않도록 매번 초기화
+  const { resetAll } = await import('../js/storage.js');
+  await resetAll();
   return { view: w.document.getElementById('view') };
 }
 
@@ -66,6 +69,21 @@ test('문제 풀이: 오늘의 문제 → 풀이 → 해설 → 결과, 푼 문�
     assert.match(document.querySelector('.banner').textContent, wrong ? /오답/ : /정답/);
     assert.ok(document.querySelector('.exp h3'), '해설 섹션이 보여야 함');
     assert.equal(document.querySelectorAll('.choice.correct').length, 1);
+    assert.ok(document.querySelector('.jp-note'), '일본어 해설(포인트)은 바로 보여야 함');
+    if (n === 0) {
+      // 한국어 해석은 기본 숨김 → 버튼을 눌러야 보인다
+      const ko = document.querySelector('.ko');
+      assert.ok(ko && ko.hidden, '한국어 해석은 기본으로 숨겨져 있어야 함');
+      assert.ok(btn('한국어 해석 보기'));
+      btn('한국어 해석 보기').click();
+      assert.equal(ko.hidden, false);
+      assert.ok(btn('한국어 해석 숨기기'));
+      assert.ok(q.explanation.choice_meanings.every(m => ko.textContent.includes(m)), '선택지 4개의 한국어 뜻이 보여야 함');
+      assert.ok(ko.textContent.includes(q.explanation.point_ko), '포인트의 한국어판이 보여야 함');
+      assert.ok(ko.textContent.includes(q.explanation.translation), '한국어 번역이 보여야 함');
+      btn('한국어 해석 숨기기').click();
+      assert.equal(ko.hidden, true);
+    }
     if (wrong) wrongCount++;
     n++;
     const last = !btn('다음 문제');
@@ -150,6 +168,160 @@ test('단어 오답노트: 사이클 → 몰랐던 단어 다시 풀기 → 새 
 
   await clickBtn('새로운 사이클로 다시 풀기');
   await waitFor(() => /1 \/ 10/.test(bodyText()), '새 사이클 1 / 10');
+});
+
+const segBtn = label => [...document.querySelectorAll('.seg button')].find(b => b.textContent.trim().startsWith(label));
+
+test('한자만 저장하면 미완성으로 표시되고, 목록에서 미완성만 모아 볼 수 있다', { skip: !JSDOM }, async () => {
+  const { view } = await setup();
+  const { renderVocab } = await import('../js/vocab.js');
+  const { addWord, allWords, isIncomplete } = await import('../js/words.js');
+  await addWord({ word: '納める' });                                         // 한자만 → 미완성
+  await addWord({ word: 'うっかり', meaning: '깜빡' });                       // 한자 없음 + 뜻 있음 → 완성
+  await addWord({ word: '更新', reading: 'こうしん', meaning: '갱신' });       // 완성
+  await addWord({ word: '提供', meaning: '제공' });                           // 한자인데 읽기 없음 → 미완성
+  assert.deepEqual((await allWords()).map(isIncomplete), [true, false, false, true]);
+
+  await renderVocab(view);
+  segBtn('목록').click();
+  await waitFor(() => document.querySelector('.word'), '목록');
+  assert.equal(document.querySelectorAll('.word .badge').length, 2);
+  segBtn('미완성').click();
+  await waitFor(() => document.querySelectorAll('.word').length === 2, '미완성 필터');
+  assert.deepEqual([...document.querySelectorAll('.word .w')].map(e => e.textContent).sort(), ['提供', '納める']);
+  segBtn('전체').click();
+  await waitFor(() => document.querySelectorAll('.word').length === 4, '전체 필터');
+
+  // 일괄 추가: 단어만 적은 줄도 허용
+  segBtn('추가').click();
+  await waitFor(() => document.querySelector('textarea'), '추가 화면');
+  document.querySelector('textarea').value = '提出\n返却, へんきゃく, 반납';
+  await clickBtn('일괄 추가');
+  await waitFor(async () => true, '대기');
+  await sleep(50);
+  const words = await allWords();
+  assert.equal(words.length, 6);
+  assert.equal(isIncomplete(words.find(w => w.word === '提出')), true);
+  assert.equal(isIncomplete(words.find(w => w.word === '返却')), false);
+
+  // 학습 카드: 미완성 단어는 뜻을 공개한 뒤 '입력하기' 버튼이 나온다
+  segBtn('학습').click();
+  await clickBtn('시작');
+  await waitFor(() => document.querySelector('.vcard .word-big'), '카드');
+  const shown = document.querySelector('.vcard .word-big').textContent;
+  document.querySelector('.vcard').click();
+  assert.equal(!!btn('✏️ 읽기·뜻 입력하기'), isIncomplete(words.find(w => w.word === shown)));
+});
+
+test('nihongokanji 연결은 한자 한 글자 단위이고, 그 사이트 주소만 저장한다', { skip: !JSDOM }, async () => {
+  const { view } = await setup();
+  const { kanjiChips, validLink, searchUrl } = await import('../js/kanji.js');
+  const { kanjiOf } = await import('../js/words.js');
+  const { load, exportAll } = await import('../js/storage.js');
+
+  assert.deepEqual(kanjiOf('納める'), ['納']);
+  assert.deepEqual(kanjiOf('入り口'), ['入', '口']);
+  assert.deepEqual(kanjiOf('時々'), ['時'], '반복 기호 々 는 한자로 세지 않음');
+  assert.deepEqual(kanjiOf('更新更'), ['更', '新'], '중복 제거');
+  assert.deepEqual(kanjiOf('うっかり'), []);
+  assert.equal(kanjiChips('うっかり'), null, '한자가 없으면 칩도 없음');
+
+  assert.equal(validLink(' https://nihongokanji.com/8 '), 'https://nihongokanji.com/8');
+  for (const bad of ['http://nihongokanji.com/8', 'https://nihongokanji.com.evil.com/8', 'https://example.com/nihongokanji.com', 'javascript:alert(1)', 'abc', '']) {
+    assert.equal(validLink(bad), null, bad);
+  }
+
+  const box = kanjiChips('更新');
+  view.append(box);
+  await waitFor(() => box.querySelectorAll('.kchip').length === 2, '칩');
+  assert.deepEqual([...box.querySelectorAll('.kchip')].map(b => b.textContent), ['更', '新'], '단어 전체가 아니라 한 글자씩');
+
+  // 주소가 없으면 구글 사이트 검색으로 연결
+  box.querySelector('.kchip').click();
+  let link = await waitFor(() => document.querySelector('.modal a.btn'), '시트');
+  assert.equal(link.href, searchUrl('更'));
+  assert.match(link.href, /google\.com\/search\?q=site%3Anihongokanji\.com/);
+  assert.equal(link.target, '_blank');
+  assert.match(link.rel, /noopener/);
+
+  // 다른 사이트 주소는 저장 거부(시트는 그대로)
+  const input = document.querySelector('.modal input');
+  input.value = 'https://evil.example.com/8';
+  await clickBtn('주소 저장');
+  await waitFor(() => document.getElementById('toast').textContent.includes('nihongokanji.com'), '거부 안내');
+  assert.ok(document.querySelector('.modal'), '거부되면 시트가 닫히지 않음');
+  assert.equal((await load('kanjiLinks'))['更'], undefined);
+
+  // 올바른 주소는 저장되고, 다음부터는 바로 그 주소로 연결
+  input.value = 'https://nihongokanji.com/123';
+  await clickBtn('주소 저장');
+  await waitFor(() => !document.querySelector('.modal'), '시트 닫힘');
+  assert.equal((await load('kanjiLinks'))['更'], 'https://nihongokanji.com/123');
+  await waitFor(() => view.querySelector('.kchip.saved'), '저장 표시');
+  assert.equal(view.querySelectorAll('.kchip.saved').length, 1, '저장한 한자만 표시');
+  view.querySelector('.kchip.saved').click();
+  link = await waitFor(() => document.querySelector('.modal a.btn'), '시트 다시 열기');
+  assert.equal(link.href, 'https://nihongokanji.com/123');
+  assert.equal(link.textContent, 'nihongokanji에서 보기');
+  assert.equal((await exportAll()).data.kanjiLinks['更'], 'https://nihongokanji.com/123', '백업에 포함');
+
+  await clickBtn('주소 삭제');
+  await waitFor(() => !document.querySelector('.modal'), '삭제 후 닫힘');
+  assert.equal((await load('kanjiLinks'))['更'], undefined);
+});
+
+test('문제 화면에서 글자를 선택하면 추가 바가 뜨고 오답노트(미완성)로 저장된다', { skip: !JSDOM }, async () => {
+  const { view } = await setup();
+  const { renderQuizHome } = await import('../js/quiz.js');
+  const { initSelectionBar, refreshSelectionBar } = await import('../js/select.js');
+  const { allWords, isIncomplete } = await import('../js/words.js');
+  initSelectionBar();
+  document.body.dataset.route = 'quiz';
+  await renderQuizHome(view);
+  await clickBtn('시작');
+  await waitFor(() => document.querySelector('.choice'), '선택지');
+  const bar = document.getElementById('selbar');
+  assert.equal(bar.hidden, true);
+
+  const select = node => {
+    const r = document.createRange(); r.selectNodeContents(node);
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  };
+  const span = document.querySelector('.choice span');
+  const expected = span.textContent.replace(/\s/g, '');
+  select(span);
+  refreshSelectionBar();
+  assert.equal(bar.hidden, false);
+  assert.equal(bar.querySelector('.selbar-text').textContent, `「${expected}」`);
+
+  // 글자를 고르던 직후의 탭은 정답 선택으로 처리되지 않는다
+  document.querySelector('.choice').click();
+  assert.equal(document.querySelector('.banner'), null);
+
+  await clickBtn('＋ 오답노트에 추가');
+  await waitFor(() => bar.hidden, '바 숨김');
+  const words = await allWords();
+  assert.equal(words.length, 1);
+  assert.equal(words[0].word, expected);
+  assert.equal(words[0].source, 'select');
+  assert.equal(words[0].meaning, '', '읽기·뜻은 비워 둠');
+  assert.equal(isIncomplete(words[0]), !!words[0].word.match(/[一-鿿]/) || true);
+
+  // 너무 긴 선택, 문제 화면이 아닌 곳에서의 선택은 무시
+  select(document.querySelector('.card'));
+  refreshSelectionBar();
+  assert.equal(bar.hidden, true, '30자를 넘는 선택은 무시');
+  document.body.dataset.route = 'vocab';
+  select(span);
+  refreshSelectionBar();
+  assert.equal(bar.hidden, true, '문제 화면이 아니면 바가 뜨지 않음');
+  document.body.dataset.route = 'quiz';
+
+  // 시간이 지난 뒤의 탭은 정상적으로 답 선택
+  window.getSelection().removeAllRanges();
+  await sleep(700);
+  document.querySelector('.choice').click();
+  await waitFor(() => document.querySelector('.banner'), '해설 배너');
 });
 
 test('마크업과 sanitizer', { skip: !JSDOM }, async () => {

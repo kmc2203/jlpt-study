@@ -4,6 +4,7 @@ import { load, commit } from './storage.js';
 import { TYPES, loadData, balancedPick, dailyAvailable, extraAvailable, wrongAvailable, unreleasedCount } from './data.js';
 import { addWord, findWord } from './words.js';
 import { openWordModal } from './vocab.js';
+import { recentlySelected } from './select.js';
 
 let session = null; // { items, queue:[{item, qi}], pos, mode, results:{id:[bool]}, answered }
 
@@ -73,8 +74,11 @@ function renderQuestion() {
   session.answered = false;
   const pct = Math.round((session.pos / session.queue.length) * 100);
 
-  const choiceBtns = q.choices.map((c, i) => h('button', {
-    class: 'choice jp', onclick: () => choose(i, choiceBtns),
+  // 글자를 길게 눌러 선택할 수 있도록 button 이 아닌 div[role=button] 로 만든다
+  const choiceBtns = q.choices.map((c, i) => h('div', {
+    class: 'choice jp', role: 'button', tabindex: '0',
+    onclick: () => choose(i, choiceBtns),
+    onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(i, choiceBtns); } },
   }, h('b', {}, String(i + 1)), h('span', { html: fmt(c) })));
 
   const passage = item.passage_html
@@ -101,19 +105,23 @@ function renderQuestion() {
 
 async function choose(i, btns) {
   if (session.answered) return;
+  // 글자를 선택하던 중의 탭(선택 해제용)이 답 선택으로 처리되지 않게 한다
+  if (recentlySelected()) return;
   session.answered = true;
   const { item, qi } = session.queue[session.pos];
   const q = item.questions[qi];
   const ok = i === q.answer;
   btns.forEach((b, k) => {
-    b.disabled = true;
+    b.classList.add('locked');
+    b.setAttribute('aria-disabled', 'true');
+    b.removeAttribute('tabindex');
     if (k === q.answer) b.classList.add('correct');
     else if (k === i) b.classList.add('wrong');
   });
   (session.results[item.id] ||= [])[qi] = ok;
   await recordAnswer(item, qi, ok);
 
-  $('#exp').replaceChildren(buildExplanation(item, q, ok, i));
+  $('#exp').replaceChildren(buildExplanation(item, q, ok));
   const last = session.pos === session.queue.length - 1;
   const actions = $('#actions');
   actions.replaceChildren(
@@ -146,7 +154,7 @@ function next() {
 }
 
 /* ───────── 해설 ───────── */
-function buildExplanation(item, q, ok, picked) {
+function buildExplanation(item, q, ok) {
   const e = q.explanation || {};
   const card = h('div', { class: 'card exp' });
   card.append(h('div', { class: 'banner ' + (ok ? 'ok' : 'ng') },
@@ -160,21 +168,52 @@ function buildExplanation(item, q, ok, picked) {
   if (item.type === 'sentence_order' && Array.isArray(q.order)) {
     card.append(h('div', { class: 'sub' }, '올바른 배열: ' + q.order.map(k => CIRCLED[k]).join(' → ') + `  (★ = ${CIRCLED[q.answer]})`));
   }
-  if (e.translation) card.append(h('h3', {}, '번역'), h('div', {}, e.translation));
-  if (e.point) card.append(h('h3', {}, '포인트'), h('div', { html: fmt(e.point) }));
+
+  // 한국어 해석은 기본 숨김. 일본어 해설을 먼저 읽고, 필요할 때 펼친다.
+  const ko = koSection(item, q, e);
+  const toggle = h('button', { class: 'btn block ko-toggle', 'aria-expanded': 'false' }, '한국어 해석 보기');
+  toggle.addEventListener('click', () => {
+    ko.hidden = !ko.hidden;
+    toggle.textContent = ko.hidden ? '한국어 해석 보기' : '한국어 해석 숨기기';
+    toggle.setAttribute('aria-expanded', String(!ko.hidden));
+  });
+  card.append(toggle, ko);
+
+  if (e.point) card.append(h('h3', {}, '포인트'), h('div', { class: 'jp-note', html: fmt(e.point) }));
   if (Array.isArray(e.choices) && e.choices.length) {
     card.append(h('h3', {}, '선택지 해설'),
-      h('ol', { style: 'list-style:none;padding-left:0' },
+      h('ol', { class: 'plain-list' },
         ...e.choices.map((t, k) => h('li', {}, h('b', {}, CIRCLED[k] + ' '), h('span', { html: fmt(t) })))));
   }
   if (Array.isArray(e.words) && e.words.length) {
     card.append(h('h3', {}, '주요 단어 (＋ 를 누르면 단어 오답노트에 저장)'),
       h('div', { class: 'words' }, ...e.words.map(w => wordRow(w, item.id))));
   }
-  if (item.passage_translation) {
-    card.append(h('details', {}, h('summary', {}, '지문 번역 보기'), h('div', { style: 'margin-top:6px' }, item.passage_translation)));
-  }
   return card;
+}
+
+// 한국어 번역 · 포인트 · 선택지별 한국어 뜻과 해설
+function koSection(item, q, e) {
+  const box = h('div', { class: 'ko', hidden: true });
+  if (item.passage_translation) {
+    box.append(h('h3', {}, '지문 번역'), h('div', {}, item.passage_translation));
+  }
+  if (e.translation) box.append(h('h3', {}, '번역'), h('div', {}, e.translation));
+  if (e.point_ko) box.append(h('h3', {}, '포인트'), h('div', {}, e.point_ko));
+  if (Array.isArray(e.choice_meanings)) {
+    box.append(h('h3', {}, '선택지 뜻'),
+      h('ol', { class: 'plain-list' },
+        ...q.choices.map((c, k) => h('li', { class: k === q.answer ? 'right' : '' },
+          h('b', {}, CIRCLED[k] + ' '),
+          h('span', { class: 'jp', html: fmt(c) }),
+          h('span', { class: 'sub' }, ' — ' + (e.choice_meanings[k] ?? ''))))));
+  }
+  if (Array.isArray(e.choices_ko) && e.choices_ko.length) {
+    box.append(h('h3', {}, '선택지 해설'),
+      h('ol', { class: 'plain-list' },
+        ...e.choices_ko.map((t, k) => h('li', {}, h('b', {}, CIRCLED[k] + ' '), h('span', {}, t)))));
+  }
+  return box;
 }
 
 function wordRow(w, itemId) {

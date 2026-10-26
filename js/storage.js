@@ -23,6 +23,7 @@ export const DEFAULTS = {
   progress: () => ({ done: {}, wrong: {}, stats: {}, days: {} }),
   settings: () => ({ furigana: false }),
   cycle: () => null,
+  kanjiLinks: () => ({}), // { 한자 한 글자: nihongokanji.com 페이지 주소 }
 };
 
 const cache = {};

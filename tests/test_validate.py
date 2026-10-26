@@ -18,7 +18,8 @@ def good_grammar(i="gr-901"):
             "stem": "雨が降った（　）、試合は中止になった。",
             "choices": ["ために", "くせに", "ものの", "わりに"], "answer": 0,
             "full": "雨が降ったために、試合は中止になった。",
-            "explanation": {"translation": "비가 와서 경기는 취소되었다.", "point": "原因を表す。", "words": [{"w": "中止", "m": "중지"}]},
+            "explanation": {"translation": "비가 와서 경기는 취소되었다.", "point": "原因を表す。", "point_ko": "원인을 나타낸다.",
+                            "choice_meanings": ["~때문에", "~주제에", "~이지만", "~에 비해"], "words": [{"w": "中止", "m": "중지"}]},
         }],
     }
 
@@ -31,7 +32,8 @@ def good_order(i="so-901"):
             "choices": ["毎日", "図書館へ", "勉強しに", "必ず"], "answer": 0,
             "order": [3, 1, 0, 2],
             "full": "私は必ず図書館へ毎日勉強しに行く。",
-            "explanation": {"translation": "나는 반드시 도서관에 매일 공부하러 간다.", "point": "語順。", "words": [{"w": "図書館", "m": "도서관"}]},
+            "explanation": {"translation": "나는 반드시 도서관에 매일 공부하러 간다.", "point": "語順。", "point_ko": "어순.",
+                            "choice_meanings": ["매일", "도서관에", "공부하러", "반드시"], "words": [{"w": "図書館", "m": "도서관"}]},
         }],
     }
 
@@ -80,6 +82,23 @@ class ValidateTest(unittest.TestCase):
     def test_missing_explanation_parts(self):
         g = good_grammar(); del g["questions"][0]["explanation"]["words"]
         self.assertEqual(run([g])[0], 1)
+
+    def test_korean_explanation_is_required(self):
+        for key in ("point_ko", "choice_meanings"):
+            g = good_grammar(); del g["questions"][0]["explanation"][key]
+            code, out = run([g])
+            self.assertEqual(code, 1, key); self.assertIn(key, out)
+
+    def test_choice_meanings_must_have_four(self):
+        g = good_grammar(); g["questions"][0]["explanation"]["choice_meanings"] = ["a", "b", "c"]
+        self.assertEqual(run([g])[0], 1)
+
+    def test_choices_notes_need_korean_pair(self):
+        g = good_grammar(); g["questions"][0]["explanation"]["choices"] = ["○ a", "× b", "× c", "× d"]
+        code, out = run([g])
+        self.assertEqual(code, 1); self.assertIn("choices_ko", out)
+        g["questions"][0]["explanation"]["choices_ko"] = ["○ 가", "× 나", "× 다", "× 라"]
+        self.assertEqual(run([g])[0], 0)
 
     def test_duplicate_id_with_existing_pool(self):
         self.assertEqual(run([good_grammar("gr-001")])[0], 1)

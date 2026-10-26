@@ -92,6 +92,18 @@ def check_question(rep, where, item, qi, q):
     if "choices" in e:
         if not (isinstance(e["choices"], list) and len(e["choices"]) == 4):
             rep.err(w, "explanation.choices 는 4개여야 함")
+    # 한국어 해설 (기본 숨김으로 표시되는 부분)
+    if not (isinstance(e.get("point_ko"), str) and e["point_ko"].strip()):
+        rep.err(w, "explanation.point_ko(포인트의 한국어판) 없음")
+    cm = e.get("choice_meanings")
+    if not (isinstance(cm, list) and len(cm) == 4 and all(isinstance(x, str) and x.strip() for x in cm)):
+        rep.err(w, "explanation.choice_meanings(선택지 4개의 한국어 뜻) 는 비어있지 않은 문자열 4개여야 함")
+    if "choices" in e:
+        ck = e.get("choices_ko")
+        if not (isinstance(ck, list) and len(ck) == 4 and all(isinstance(x, str) and x.strip() for x in ck)):
+            rep.err(w, "explanation.choices 가 있으면 choices_ko(한국어판) 4개도 필요함")
+    elif "choices_ko" in e:
+        rep.err(w, "choices_ko 는 explanation.choices 와 짝으로만 쓸 수 있음")
 
     # 빈칸 → 완성 문장 일치 검사
     full = q.get("full")
