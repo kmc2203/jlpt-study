@@ -1,0 +1,88 @@
+name: 문제 공개 & 배포
+
+on:
+  schedule:
+    - cron: "0 21 * * *"   # 매일 06:00 KST (UTC 21:00). GitHub 사정으로 몇 분~수십 분 늦을 수 있어요.
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      count:
+        description: "오늘 공개할 문제 수 (비우면 기본값)"
+        required: false
+
+permissions:
+  contents: write   # manifest.json 커밋
+  pages: write
+  id-token: write
+  issues: write     # 문제 풀 부족 알림
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  DAILY_COUNT: "5"   # ← 하루에 공개할 문제 수는 여기서 바꾸세요
+
+jobs:
+  release-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 잘못된 문제가 사이트에 올라가지 않도록, 검증에 실패하면 여기서 멈춥니다.
+      - name: 문제 풀 검증
+        run: python scripts/validate.py
+
+      - name: 오늘 문제 공개
+        id: release
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            python scripts/release.py --count 0
+          else
+            python scripts/release.py --count "${{ github.event.inputs.count || env.DAILY_COUNT }}"
+          fi
+
+      - name: manifest 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/manifest.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: 문제 공개 현황 갱신 ($(date -u +%F))"
+            git push
+          fi
+
+      - name: 사이트 파일 모으기
+        run: |
+          mkdir _site
+          cp -r index.html manifest.webmanifest sw.js css js icons data _site/
+          touch _site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: 문제 풀 부족 알림 (남은 분량 7일 이하)
+        if: github.event_name != 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DAYS_LEFT: ${{ steps.release.outputs.days_left }}
+        run: |
+          if [ -n "$DAYS_LEFT" ] && [ "$DAYS_LEFT" -le 7 ]; then
+            open=$(gh issue list --state open --search "문제 풀 보충 in:title" --json number --jq 'length')
+            if [ "$open" = "0" ]; then
+              gh issue create --title "문제 풀 보충 필요 (남은 분량 약 ${DAYS_LEFT}일)" \
+                --body "미공개 문제가 약 ${DAYS_LEFT}일치 남았어요. docs/GENERATE_PROMPT.md 로 새 batch 파일을 만들어 data/pool/ 에 추가해 주세요."
+            fi
+          fi
