@@ -6,7 +6,7 @@
 import { h, toast, openModal } from './util.js';
 import { load, commit } from './storage.js';
 import { kanjiOf } from './words.js';
-import { loadKanjiDb, showReading } from './kanjidb.js';
+import { loadKanjiDb, showReading, gradeLabel } from './kanjidb.js';
 
 export const searchUrl = k => `https://www.google.com/search?q=${encodeURIComponent('site:nihongokanji.com ' + k)}`;
 
@@ -48,7 +48,7 @@ export function kanjiCard(c) {
     h('div', { class: 'row', style: 'justify-content:center;gap:6px;margin:4px 0 8px' }, ...c.meaning.map(m => h('span', { class: 'tag' }, m))),
     row('음독', c.on.join('、') || '-'),
     row('훈독', c.kun.map(showReading).join('、') || '-'),
-    row('부수·획수', `${c.radical_ch}(${c.radical}번) · ${c.strokes}획 · ${c.grade}학년`),
+    row('부수·획수', `${c.radical_ch}(${c.radical}번) · ${c.strokes}획 · ${gradeLabel(c.grade)}`),
     h('div', { class: 'klabel', style: 'margin-top:8px' }, '대표 단어'),
     h('ul', { class: 'kwords' }, ...c.words.map(w =>
       h('li', {}, h('span', { class: 'jp kw' }, w.w), h('span', { class: 'sub' }, ` ${w.r} `), '— ' + w.m))));

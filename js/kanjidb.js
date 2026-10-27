@@ -30,3 +30,6 @@ export const cardSync = k => cache?.cards.get(k);
 
 // 사전식 표기 "やす.む" → 화면용 "やす・む"
 export const showReading = s => String(s).replace(/\./g, '・');
+
+// 학년 표시: 1~6 은 초등학교 학년, 8 은 중·고등학교에서 배우는 나머지 상용한자
+export function gradeLabel(g) { return g <= 6 ? `${g}학년` : '중·고'; }

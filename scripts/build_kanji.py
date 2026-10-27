@@ -24,7 +24,14 @@ def main(db, src, out):
 
     rows = c.execute("select ID, literal, stroke_count from character where grade=? order by ID", (str(grade),)).fetchall()
     want = [r[1] for r in rows]
-    if set(want) != set(ko["kanji"]):
+    if ko.get("part"):  # 학년 일부만 담은 분할 파일: 작성본이 학년 집합의 부분집합이면 된다(전체 합계는 테스트가 확인)
+        extra = sorted(set(ko["kanji"]) - set(want))
+        if extra:
+            errs.append(f"사전의 {grade}학년에 없는 한자: {extra}")
+        want = [k for k in ko["kanji"] if k in set(want)]
+        rows = sorted(rows, key=lambda r: want.index(r[1]) if r[1] in want else 10**9)
+        rows = [r for r in rows if r[1] in want]
+    elif set(want) != set(ko["kanji"]):
         errs.append(f"한자 집합 불일치: 사전에만 {sorted(set(want) - set(ko['kanji']))} / 작성본에만 {sorted(set(ko['kanji']) - set(want))}")
 
     def readings(cid, kind):

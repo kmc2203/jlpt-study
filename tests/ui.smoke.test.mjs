@@ -330,7 +330,7 @@ test('한자 카드: 목록에서 열고, 오답노트 한자 칩에서도 카�
   const { kanjiChips } = await import('../js/kanji.js');
   await renderKanjiList(view);
   assert.equal(document.querySelectorAll('.kcell').length, 80, '1학년 80자');
-  const gradeBtn = n => [...document.querySelectorAll('.seg button')].find(b => b.textContent.startsWith(`${n}학년`));
+  const gradeBtn = n => [...document.querySelectorAll('.seg button')].find(b => b.textContent.startsWith(n === 8 ? '중·고' : `${n}학년`));
   gradeBtn(2).click();
   await waitFor(() => document.querySelectorAll('.kcell').length === 160, '2학년 160자');
   gradeBtn(3).click();
@@ -341,6 +341,8 @@ test('한자 카드: 목록에서 열고, 오답노트 한자 칩에서도 카�
   await waitFor(() => document.querySelectorAll('.kcell').length === 185, '5학년 185자');
   gradeBtn(6).click();
   await waitFor(() => document.querySelectorAll('.kcell').length === 181, '6학년 181자');
+  gradeBtn(8).click();
+  await waitFor(() => document.querySelectorAll('.kcell').length === 350, '중·고 1차분 350자');
   gradeBtn(1).click();
   await waitFor(() => document.querySelectorAll('.kcell').length === 80, '다시 1학년');
   const cell = [...document.querySelectorAll('.kcell')].find(b => b.querySelector('.kk').textContent === '休');
