@@ -330,6 +330,11 @@ test('한자 카드: 목록에서 열고, 오답노트 한자 칩에서도 카�
   const { kanjiChips } = await import('../js/kanji.js');
   await renderKanjiList(view);
   assert.equal(document.querySelectorAll('.kcell').length, 80, '1학년 80자');
+  const gradeBtn = n => [...document.querySelectorAll('.seg button')].find(b => b.textContent.startsWith(`${n}학년`));
+  gradeBtn(2).click();
+  await waitFor(() => document.querySelectorAll('.kcell').length === 160, '2학년 160자');
+  gradeBtn(1).click();
+  await waitFor(() => document.querySelectorAll('.kcell').length === 80, '다시 1학년');
   const cell = [...document.querySelectorAll('.kcell')].find(b => b.querySelector('.kk').textContent === '休');
   assert.ok(cell.textContent.includes('쉴 휴'));
   cell.click();
@@ -396,7 +401,7 @@ test('문제 화면에서 한자 한 글자를 선택하면 「한자 카드」 
   const cardBtn = [...bar.querySelectorAll('button')].find(b => b.textContent === '한자 카드');
   select(0, 1);                       // 休
   assert.equal(bar.hidden, false); assert.equal(cardBtn.hidden, false);
-  select(4, 5);                       // 更 (카드 없음)
+  select(3, 4);                       // 更 (5학년, 아직 카드 없음)
   assert.equal(bar.hidden, false); assert.equal(cardBtn.hidden, true, '카드가 없는 한자에는 버튼 없음');
   select(0, 2);                       // 休日 (두 글자)
   assert.equal(cardBtn.hidden, true);
