@@ -342,7 +342,7 @@ test('한자 카드: 목록에서 열고, 오답노트 한자 칩에서도 카�
   gradeBtn(6).click();
   await waitFor(() => document.querySelectorAll('.kcell').length === 181, '6학년 181자');
   gradeBtn(8).click();
-  await waitFor(() => document.querySelectorAll('.kcell').length === 350, '중·고 1차분 350자');
+  await waitFor(() => document.querySelectorAll('.kcell').length === 700, '중·고 1·2차분 700자');
   gradeBtn(1).click();
   await waitFor(() => document.querySelectorAll('.kcell').length === 80, '다시 1학년');
   const cell = [...document.querySelectorAll('.kcell')].find(b => b.querySelector('.kk').textContent === '休');
