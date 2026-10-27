@@ -342,7 +342,7 @@ test('한자 카드: 목록에서 열고, 오답노트 한자 칩에서도 카�
   gradeBtn(6).click();
   await waitFor(() => document.querySelectorAll('.kcell').length === 181, '6학년 181자');
   gradeBtn(8).click();
-  await waitFor(() => document.querySelectorAll('.kcell').length === 700, '중·고 1·2차분 700자');
+  await waitFor(() => document.querySelectorAll('.kcell').length === 1110, '중·고 전체 1110자');
   gradeBtn(1).click();
   await waitFor(() => document.querySelectorAll('.kcell').length === 80, '다시 1학년');
   const cell = [...document.querySelectorAll('.kcell')].find(b => b.querySelector('.kk').textContent === '休');
@@ -354,8 +354,8 @@ test('한자 카드: 목록에서 열고, 오답노트 한자 칩에서도 카�
   assert.ok(document.querySelector('.modal a.btn').href.includes('nihongokanji.com'), '카드 아래에 nihongokanji 연결');
   await clickBtn('닫기');
 
-  // 오답노트의 한자 칩 → 같은 카드. 카드가 없는 한자(更)는 기존처럼 연결 시트만
-  const box = kanjiChips('休む更'); view.append(box);
+  // 오답노트의 한자 칩 → 같은 카드. 카드가 없는 한자(凛, 상용한자 밖)는 기존처럼 연결 시트만
+  const box = kanjiChips('休む凛'); view.append(box);
   await waitFor(() => box.querySelectorAll('.kchip').length === 2, '칩');
   box.querySelectorAll('.kchip')[0].click();
   await waitFor(() => document.querySelector('.modal .kcard'), '칩에서 카드');
@@ -372,7 +372,7 @@ test('한자 카드가 있는 한자 한 글자는 미완성이 아니라 카드
   const { renderVocab } = await import('../js/vocab.js');
   const { addWord, allWords, isIncomplete, shown, cardFor } = await import('../js/words.js');
   await addWord({ word: '休' });                              // 카드 있음
-  await addWord({ word: '更' });                              // 카드 없음
+  await addWord({ word: '凛' });                              // 카드 없음
   await addWord({ word: '休む' });                            // 두 글자 이상은 카드로 못 채움
   await addWord({ word: '日', reading: 'にち', meaning: '날' }); // 직접 입력이 우선
   const [a, b, c, d] = await allWords();
@@ -391,7 +391,7 @@ test('한자 카드가 있는 한자 한 글자는 미완성이 아니라 카드
   assert.equal(row.querySelector('.badge:not(.link)'), null, '미완성 배지는 없음');
   assert.ok(row.textContent.includes('쉴 휴'));
   const todo = [...document.querySelectorAll('.seg button')].find(x => x.textContent.startsWith('미완성'));
-  assert.ok(todo.textContent.includes('2'), '미완성은 更, 休む 두 개');
+  assert.ok(todo.textContent.includes('2'), '미완성은 凛, 休む 두 개');
 });
 
 test('문제 화면에서 한자 한 글자를 선택하면 「한자 카드」 버튼이 뜬다', { skip: !JSDOM }, async () => {
@@ -401,7 +401,7 @@ test('문제 화면에서 한자 한 글자를 선택하면 「한자 카드」 
   const { initSelectionBar, refreshSelectionBar } = await import('../js/select.js');
   initSelectionBar();
   document.body.dataset.route = 'quiz';
-  const p = document.createElement('p'); p.textContent = '休日に更新する'; view.replaceChildren(p);
+  const p = document.createElement('p'); p.textContent = '休日に凛とする'; view.replaceChildren(p);
   const select = (start, end) => {
     const r = document.createRange(); r.setStart(p.firstChild, start); r.setEnd(p.firstChild, end);
     const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
@@ -411,7 +411,7 @@ test('문제 화면에서 한자 한 글자를 선택하면 「한자 카드」 
   const cardBtn = [...bar.querySelectorAll('button')].find(b => b.textContent === '한자 카드');
   select(0, 1);                       // 休
   assert.equal(bar.hidden, false); assert.equal(cardBtn.hidden, false);
-  select(3, 4);                       // 更 (5학년, 아직 카드 없음)
+  select(3, 4);                       // 凛 (상용한자 밖이라 카드 없음)
   assert.equal(bar.hidden, false); assert.equal(cardBtn.hidden, true, '카드가 없는 한자에는 버튼 없음');
   select(0, 2);                       // 休日 (두 글자)
   assert.equal(cardBtn.hidden, true);
