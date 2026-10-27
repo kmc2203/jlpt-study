@@ -6,8 +6,10 @@ import { allWords } from './words.js';
 import { renderQuizHome } from './quiz.js';
 import { renderVocab } from './vocab.js';
 import { initSelectionBar, refreshSelectionBar } from './select.js';
+import { renderKanjiList } from './kanjilist.js';
+import { openModal } from './util.js';
 
-const TITLES = { home: 'JLPT N2 공부방', quiz: '문제 풀이', vocab: '단어 오답노트', settings: '설정' };
+const TITLES = { home: 'JLPT N2 공부방', quiz: '문제 풀이', vocab: '단어 오답노트', settings: '설정', kanji: '한자 카드' };
 
 async function applySettings() {
   const s = await load('settings');
@@ -47,6 +49,7 @@ async function renderHome(view) {
       h('h2', {}, '오늘 할 일'),
       h('div', { class: 'sub' }, `풀 문제 ${dailyN}개 · 복습할 틀린 문제 ${wrongN}개`),
       h('div', { class: 'row end' },
+        h('a', { class: 'btn', href: '#/kanji', style: 'text-decoration:none' }, '한자 카드'),
         h('a', { class: 'btn', href: '#/vocab', style: 'text-decoration:none' }, '단어 학습'),
         h('a', { class: 'btn primary', href: '#/quiz', style: 'text-decoration:none' }, '문제 풀기'))),
     h('div', { class: 'card' },
@@ -58,6 +61,21 @@ async function renderHome(view) {
           h('div', { class: 'track' }, h('i', { style: `width:${pct}%` })),
           h('span', { class: 'sub' }, `${pct}% (${s.ok}/${s.n})`));
       })) : h('div', { class: 'sub' }, '아직 푼 문제가 없어요. 오늘 첫 문제를 풀어 볼까요?')));
+}
+
+/* ───────── 출처·라이선스 ───────── */
+function openCredits() {
+  const a = (href, text) => h('a', { href, target: '_blank', rel: 'noopener noreferrer' }, text);
+  openModal('출처·라이선스', h('div', { class: 'credits' },
+    h('p', {}, '한자 카드의 음독·획수·부수와 대표 단어의 읽기 확인에는 다음 공개 사전 데이터를 사용했어요.'),
+    h('ul', {},
+      h('li', {}, 'KANJIDIC2 — 한자 정보'),
+      h('li', {}, 'JMdict — 일본어 사전')),
+    h('p', {}, '이 데이터는 ', a('https://www.edrdg.org/', 'Electronic Dictionary Research and Development Group (EDRDG)'),
+      ' 의 저작물이며, ', a('https://creativecommons.org/licenses/by-sa/4.0/', 'CC BY-SA 4.0'), ' 및 ',
+      a('https://www.edrdg.org/edrdg/licence.html', 'EDRDG 라이선스'), ' 에 따라 사용합니다.'),
+    h('p', {}, '한국어 훈음·뜻·대표 단어의 한국어 설명과 문제·해설은 이 앱에서 직접 작성했어요. 한자 풀이 사이트 nihongokanji.com 의 내용은 복사하지 않고 링크로만 연결합니다.')),
+  [{ label: '닫기' }]);
 }
 
 /* ───────── 설정 ───────── */
@@ -101,6 +119,10 @@ async function renderSettings(view) {
         } }, '내보내기'),
         h('button', { class: 'btn', onclick: () => file.click() }, '가져오기'), file)),
     h('div', { class: 'card' },
+      h('h3', {}, '출처·라이선스'),
+      h('div', { class: 'sub' }, '한자 카드에 쓴 공개 데이터의 출처를 확인할 수 있어요.'),
+      h('button', { class: 'btn', style: 'margin-top:8px', onclick: openCredits }, '출처·라이선스 보기')),
+    h('div', { class: 'card' },
       h('h3', {}, '초기화'),
       h('button', { class: 'btn ng', onclick: async () => {
         if (!confirm('모든 학습 기록과 단어를 삭제합니다. 되돌릴 수 없어요. 계속할까요?')) return;
@@ -120,6 +142,7 @@ async function route() {
     if (name === 'quiz') await renderQuizHome(view);
     else if (name === 'vocab') await renderVocab(view);
     else if (name === 'settings') await renderSettings(view);
+    else if (name === 'kanji') await renderKanjiList(view);
     else await renderHome(view);
   } catch (e) {
     console.error(e);

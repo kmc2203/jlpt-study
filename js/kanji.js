@@ -6,6 +6,7 @@
 import { h, toast, openModal } from './util.js';
 import { load, commit } from './storage.js';
 import { kanjiOf } from './words.js';
+import { loadKanjiDb, showReading } from './kanjidb.js';
 
 export const searchUrl = k => `https://www.google.com/search?q=${encodeURIComponent('site:nihongokanji.com ' + k)}`;
 
@@ -38,16 +39,32 @@ export function kanjiChips(word) {
   return box;
 }
 
+// 한자 카드 본문 (카드 데이터가 있는 한자만)
+export function kanjiCard(c) {
+  const row = (label, value) => h('div', { class: 'krow' }, h('span', { class: 'klabel' }, label), h('span', { class: 'jp' }, value));
+  return h('div', { class: 'kcard' },
+    h('div', { class: 'kanji-big jp' }, c.k),
+    h('div', { class: 'khun' }, c.hunum),
+    h('div', { class: 'row', style: 'justify-content:center;gap:6px;margin:4px 0 8px' }, ...c.meaning.map(m => h('span', { class: 'tag' }, m))),
+    row('음독', c.on.join('、') || '-'),
+    row('훈독', c.kun.map(showReading).join('、') || '-'),
+    row('부수·획수', `${c.radical_ch}(${c.radical}번) · ${c.strokes}획 · ${c.grade}학년`),
+    h('div', { class: 'klabel', style: 'margin-top:8px' }, '대표 단어'),
+    h('ul', { class: 'kwords' }, ...c.words.map(w =>
+      h('li', {}, h('span', { class: 'jp kw' }, w.w), h('span', { class: 'sub' }, ` ${w.r} `), '— ' + w.m))));
+}
+
 export async function openKanjiSheet(k, onChange) {
   const links = await load('kanjiLinks');
+  const card = (await loadKanjiDb()).cards.get(k);
   const saved = links[k];
   const input = h('input', { type: 'text', inputmode: 'url', value: saved || '', placeholder: 'https://nihongokanji.com/…' });
   const go = h('a', {
     class: 'btn primary block', href: saved || searchUrl(k), target: '_blank', rel: 'noopener noreferrer',
-    style: 'text-align:center;text-decoration:none',
+    style: 'display:block;text-align:center;text-decoration:none;margin-top:10px',
   }, saved ? 'nihongokanji에서 보기' : 'nihongokanji에서 찾기 (구글 검색)');
   const body = h('div', {},
-    h('div', { class: 'kanji-big jp' }, k),
+    card ? kanjiCard(card) : h('div', { class: 'kanji-big jp' }, k),
     go,
     h('div', { class: 'sub', style: 'margin:10px 0 4px' }, saved
       ? '저장된 주소로 바로 이동해요. 주소를 바꾸려면 아래에서 수정하세요.'

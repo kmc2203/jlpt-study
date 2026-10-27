@@ -324,6 +324,32 @@ test('문제 화면에서 글자를 선택하면 추가 바가 뜨고 오답노�
   await waitFor(() => document.querySelector('.banner'), '해설 배너');
 });
 
+test('한자 카드: 목록에서 열고, 오답노트 한자 칩에서도 카드가 열린다', { skip: !JSDOM }, async () => {
+  const { view } = await setup();
+  const { renderKanjiList } = await import('../js/kanjilist.js');
+  const { kanjiChips } = await import('../js/kanji.js');
+  await renderKanjiList(view);
+  assert.equal(document.querySelectorAll('.kcell').length, 80, '1학년 80자');
+  const cell = [...document.querySelectorAll('.kcell')].find(b => b.querySelector('.kk').textContent === '休');
+  assert.ok(cell.textContent.includes('쉴 휴'));
+  cell.click();
+  await waitFor(() => document.querySelector('.modal .kcard'), '카드');
+  const card = document.querySelector('.modal .kcard').textContent;
+  for (const t of ['쉴 휴', 'キュウ', 'やす・む', '6획', '1학년', '休日', '휴일']) assert.ok(card.includes(t), t);
+  assert.ok(document.querySelector('.modal a.btn').href.includes('nihongokanji.com'), '카드 아래에 nihongokanji 연결');
+  await clickBtn('닫기');
+
+  // 오답노트의 한자 칩 → 같은 카드. 카드가 없는 한자(更)는 기존처럼 연결 시트만
+  const box = kanjiChips('休む更'); view.append(box);
+  await waitFor(() => box.querySelectorAll('.kchip').length === 2, '칩');
+  box.querySelectorAll('.kchip')[0].click();
+  await waitFor(() => document.querySelector('.modal .kcard'), '칩에서 카드');
+  await clickBtn('닫기');
+  box.querySelectorAll('.kchip')[1].click();
+  await waitFor(() => document.querySelector('.modal a.btn'), '카드 없는 한자 시트');
+  assert.equal(document.querySelector('.modal .kcard'), null);
+});
+
 test('마크업과 sanitizer', { skip: !JSDOM }, async () => {
   await setup();
   const { fmt, plain, sanitizeHtml } = await import('../js/util.js');

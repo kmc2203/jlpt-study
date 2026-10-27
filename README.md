@@ -14,6 +14,7 @@
 | 틀린 문제 복습 | 틀린 문제만 다시. 다 맞히면 목록에서 빠짐 |
 | 단어 오답노트 | 10개 사이클, 알아요/몰라요, 몰랐던 단어 다시 풀기, 새 사이클, 단어 추가·일괄 추가·수정·삭제. 단어(한자)만 저장해도 되며 읽기·뜻이 비면 「미완성」 배지 + 목록 필터 |
 | 글자 선택 → 추가 | 문제 화면에서 글자를 길게 눌러 선택하면 아래에 「＋ 오답노트에 추가」 바가 뜸 |
+| 한자 카드 | 한자 칩이나 「한자 카드」 목록(학년별)에서 한자를 누르면 카드가 열림: 한국어 훈음·뜻, 음독·훈독, 부수·획수·학년, 대표 단어 3개. 지금은 1학년 80자, 이후 학년별로 추가 |
 | 한자 → nihongokanji | 단어의 한자는 한 글자씩 칩으로 표시. 누르면 nihongokanji.com 구글 사이트 검색으로 연결되고, 찾은 페이지 주소를 저장하면 다음부터 바로 연결 (사이트 내용은 복사하지 않음, 주소만 저장) |
 | 통계 | 연속 학습일, 유형별 정답률 |
 | 백업 | 설정에서 JSON 내보내기/가져오기 |
@@ -96,6 +97,13 @@ python3 scripts/validate.py    # 문제 풀 검증
 ```
 
 `point_ko`, `choice_meanings`(4개), 그리고 `choices` 가 있으면 `choices_ko`(4개)는 필수이며 `scripts/validate.py` 가 검사합니다.
+
+## 한자 카드 데이터
+
+- `data/kanji/index.json` 에 적힌 파일을 앱이 읽습니다. 학년을 늘릴 때는 `scripts/kanji_src/grade-N.ko.json`(직접 작성한 한국어 훈음·뜻·대표 단어)을 만들고 아래 명령으로 생성한 뒤 `index.json` 에 추가합니다.
+- `python3 -I scripts/build_kanji.py <jamdict.db> scripts/kanji_src/grade-1.ko.json data/kanji/grade-1.json`
+  생성 중 학년 한자 집합·한국 한자음·훈독·대표 단어(JMdict)를 공개 데이터와 대조해서 어긋나면 실패합니다. `jamdict.db` 는 PyPI 의 `jamdict-data` 패키지에 들어 있습니다(저장소에는 넣지 않음).
+- 출처: KANJIDIC2 / JMdict © EDRDG, CC BY-SA 4.0 (앱의 설정 → 출처·라이선스에 표기).
 
 ## 알려진 한계 / 다음에 할 만한 것
 

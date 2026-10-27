@@ -1,9 +1,9 @@
 // 서비스 워커: 네트워크 우선, 실패하면 캐시 (오프라인에서도 마지막으로 본 내용 사용 가능)
-const CACHE = 'jlpt-study-v2';
+const CACHE = 'jlpt-study-v3';
 const SHELL = [
   './', 'index.html', 'css/style.css', 'manifest.webmanifest',
   'js/app.js', 'js/util.js', 'js/storage.js', 'js/cycle.js', 'js/words.js',
-  'js/data.js', 'js/quiz.js', 'js/vocab.js', 'js/kanji.js', 'js/select.js',
+  'js/data.js', 'js/quiz.js', 'js/vocab.js', 'js/kanji.js', 'js/kanjidb.js', 'js/kanjilist.js', 'js/select.js',
 ];
 
 self.addEventListener('install', e => {
