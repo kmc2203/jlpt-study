@@ -350,6 +350,63 @@ test('한자 카드: 목록에서 열고, 오답노트 한자 칩에서도 카�
   assert.equal(document.querySelector('.modal .kcard'), null);
 });
 
+test('한자 카드가 있는 한자 한 글자는 미완성이 아니라 카드와 연결된다', { skip: !JSDOM }, async () => {
+  const { view } = await setup();
+  const { loadKanjiDb } = await import('../js/kanjidb.js');
+  await loadKanjiDb();
+  const { renderVocab } = await import('../js/vocab.js');
+  const { addWord, allWords, isIncomplete, shown, cardFor } = await import('../js/words.js');
+  await addWord({ word: '休' });                              // 카드 있음
+  await addWord({ word: '更' });                              // 카드 없음
+  await addWord({ word: '休む' });                            // 두 글자 이상은 카드로 못 채움
+  await addWord({ word: '日', reading: 'にち', meaning: '날' }); // 직접 입력이 우선
+  const [a, b, c, d] = await allWords();
+  assert.ok(cardFor(a) && !cardFor(b) && !cardFor(c));
+  assert.deepEqual([a, b, c, d].map(isIncomplete), [false, true, true, false]);
+  assert.ok(shown(a).reading.includes('キュウ') && shown(a).reading.includes('やす・む'));
+  assert.ok(shown(a).meaning.startsWith('쉴 휴') && shown(a).meaning.includes('쉬다'));
+  assert.equal(shown(d).reading, 'にち'); assert.equal(shown(d).meaning, '날');
+  assert.equal(a.reading, '', '저장된 값은 비어 있고, 화면에서만 카드로 채움');
+
+  await renderVocab(view);
+  [...document.querySelectorAll('.seg button')].find(x => x.textContent.startsWith('목록')).click();
+  await waitFor(() => document.querySelector('.word'), '목록');
+  const row = [...document.querySelectorAll('.word')].find(r => r.querySelector('.w').textContent === '休');
+  assert.ok(row.querySelector('.badge.link'), '카드 연결 배지');
+  assert.equal(row.querySelector('.badge:not(.link)'), null, '미완성 배지는 없음');
+  assert.ok(row.textContent.includes('쉴 휴'));
+  const todo = [...document.querySelectorAll('.seg button')].find(x => x.textContent.startsWith('미완성'));
+  assert.ok(todo.textContent.includes('2'), '미완성은 更, 休む 두 개');
+});
+
+test('문제 화면에서 한자 한 글자를 선택하면 「한자 카드」 버튼이 뜬다', { skip: !JSDOM }, async () => {
+  const { view } = await setup();
+  const { loadKanjiDb } = await import('../js/kanjidb.js');
+  await loadKanjiDb();
+  const { initSelectionBar, refreshSelectionBar } = await import('../js/select.js');
+  initSelectionBar();
+  document.body.dataset.route = 'quiz';
+  const p = document.createElement('p'); p.textContent = '休日に更新する'; view.replaceChildren(p);
+  const select = (start, end) => {
+    const r = document.createRange(); r.setStart(p.firstChild, start); r.setEnd(p.firstChild, end);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    refreshSelectionBar();
+  };
+  const bar = document.getElementById('selbar');
+  const cardBtn = [...bar.querySelectorAll('button')].find(b => b.textContent === '한자 카드');
+  select(0, 1);                       // 休
+  assert.equal(bar.hidden, false); assert.equal(cardBtn.hidden, false);
+  select(4, 5);                       // 更 (카드 없음)
+  assert.equal(bar.hidden, false); assert.equal(cardBtn.hidden, true, '카드가 없는 한자에는 버튼 없음');
+  select(0, 2);                       // 休日 (두 글자)
+  assert.equal(cardBtn.hidden, true);
+  select(0, 1);
+  cardBtn.click();
+  await waitFor(() => document.querySelector('.modal .kcard'), '카드 열림');
+  assert.ok(document.querySelector('.modal .kcard').textContent.includes('쉴 휴'));
+  assert.equal(bar.hidden, true, '카드를 열면 바는 닫힘');
+});
+
 test('마크업과 sanitizer', { skip: !JSDOM }, async () => {
   await setup();
   const { fmt, plain, sanitizeHtml } = await import('../js/util.js');

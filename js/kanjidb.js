@@ -25,5 +25,8 @@ export async function loadKanjiDb(force = false) {
   return db;
 }
 
+// 이미 불러온 카드를 바로 조회 (아직 안 불러왔으면 undefined). 앱 시작 때 loadKanjiDb() 를 한 번 불러 둔다.
+export const cardSync = k => cache?.cards.get(k);
+
 // 사전식 표기 "やす.む" → 화면용 "やす・む"
 export const showReading = s => String(s).replace(/\./g, '・');

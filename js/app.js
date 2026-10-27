@@ -7,6 +7,7 @@ import { renderQuizHome } from './quiz.js';
 import { renderVocab } from './vocab.js';
 import { initSelectionBar, refreshSelectionBar } from './select.js';
 import { renderKanjiList } from './kanjilist.js';
+import { loadKanjiDb } from './kanjidb.js';
 import { openModal } from './util.js';
 
 const TITLES = { home: 'JLPT N2 공부방', quiz: '문제 풀이', vocab: '단어 오답노트', settings: '설정', kanji: '한자 카드' };
@@ -158,6 +159,7 @@ window.addEventListener('hashchange', route);
 
 (async () => {
   await applySettings();
+  await loadKanjiDb();
   initSelectionBar();
   requestPersistence();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

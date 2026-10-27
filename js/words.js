@@ -1,6 +1,7 @@
 // 단어 오답노트 데이터 접근 (UI 없음)
 import { load, commit } from './storage.js';
 import { uid } from './util.js';
+import { cardSync, showReading } from './kanjidb.js';
 
 export const allWords = () => load('words');
 
@@ -10,8 +11,25 @@ const norm = s => String(s ?? '').trim();
 const KANJI_RE = /[㐀-䶿一-鿿豈-﫿]/g;
 export const kanjiOf = s => [...new Set(String(s ?? '').match(KANJI_RE) || [])];
 
-// '미완성' = 뜻이 없거나, 한자가 들어 있는데 읽기가 없는 단어
-export const isIncomplete = w => !norm(w.meaning) || (kanjiOf(w.word).length > 0 && !norm(w.reading));
+// 저장한 것이 한자 한 글자이고 한자 카드가 있으면 그 카드 (아니면 undefined)
+export function cardFor(w) {
+  const t = norm(typeof w === 'string' ? w : w?.word);
+  return [...t].length === 1 && kanjiOf(t).length === 1 ? cardSync(t) : undefined;
+}
+
+// 화면에 보여줄 읽기·뜻. 직접 입력한 값이 우선이고, 비어 있으면 한자 카드 내용으로 채운다(카드가 바뀌면 따라 바뀜).
+export function shown(w) {
+  const c = cardFor(w);
+  const reading = norm(w.reading) || (c ? [...c.on, ...c.kun.map(showReading)].join('、') : '');
+  const meaning = norm(w.meaning) || (c ? `${c.hunum} — ${c.meaning.join(', ')}` : '');
+  return { reading, meaning, fromCard: !!c && (!norm(w.reading) || !norm(w.meaning)) };
+}
+
+// '미완성' = (카드로 채운 값까지 합쳐서) 뜻이 없거나, 한자가 들어 있는데 읽기가 없는 단어
+export const isIncomplete = w => {
+  const s = shown(w);
+  return !s.meaning || (kanjiOf(w.word).length > 0 && !s.reading);
+};
 
 export async function findWord(word, reading = '') {
   const words = await allWords();

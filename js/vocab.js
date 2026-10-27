@@ -1,7 +1,8 @@
 // 단어 오답노트 화면: 학습(사이클) / 목록 / 추가
 import { h, toast, openModal } from './util.js';
 import { load, commit } from './storage.js';
-import { allWords, addWord, updateWord, removeWord, recordSeen, parseBulk, isIncomplete } from './words.js';
+import { allWords, addWord, updateWord, removeWord, recordSeen, parseBulk, isIncomplete, shown, cardFor } from './words.js';
+import { loadKanjiDb } from './kanjidb.js';
 import { newCycle, answer, retryRound, summary, CYCLE_SIZE } from './cycle.js';
 import { kanjiChips } from './kanji.js';
 
@@ -38,6 +39,7 @@ export function openWordModal(prefill = {}, onSaved) {
 
 /* ───────── 진입점 ───────── */
 export async function renderVocab(view) {
+  await loadKanjiDb(); // 한자 카드와 연결된 단어의 읽기·뜻을 채우려면 먼저 필요
   const words = await allWords();
   const labels = [['study', '학습'], ['list', `목록 (${words.length})`], ['add', '추가']];
   const seg = h('div', { class: 'seg' }, ...labels.map(([k, l]) =>
@@ -90,7 +92,7 @@ async function renderStudy(body, words, view) {
         unknownWords.length ? h('div', { class: 'words', style: 'margin-top:10px' }, ...unknownWords.map(w =>
           h('div', { class: 'word' },
             h('div', { class: 'info' },
-              h('div', {}, h('span', { class: 'w jp' }, w.word), '  ', h('span', { class: 'sub' }, [w.reading, w.meaning].filter(Boolean).join(' · ') || '(읽기·뜻 미입력)')),
+              h('div', {}, h('span', { class: 'w jp' }, w.word), '  ', h('span', { class: 'sub' }, [shown(w).reading, shown(w).meaning].filter(Boolean).join(' · ') || '(읽기·뜻 미입력)')),
               kanjiChips(w.word))))) : h('div', { class: 'sub', style: 'margin-top:6px' }, '모두 알고 있었어요 🎉')),
       h('div', { class: 'actions' },
         h('button', { class: 'btn', disabled: !unknownWords.length, onclick: async () => {
@@ -109,8 +111,9 @@ async function renderStudy(body, words, view) {
     const chips = kanjiChips(w.word); // 한자 한 글자씩 nihongokanji 연결
     if (chips) card.append(chips);
     if (revealed) {
-      if (w.reading) card.append(h('div', { class: 'reading jp' }, w.reading));
-      card.append(w.meaning ? h('div', { class: 'meaning' }, w.meaning) : h('div', { class: 'meaning sub' }, '(뜻을 아직 입력하지 않았어요)'));
+      const s = shown(w);
+      if (s.reading) card.append(h('div', { class: 'reading jp' }, s.reading));
+      card.append(s.meaning ? h('div', { class: 'meaning' }, s.meaning) : h('div', { class: 'meaning sub' }, '(뜻을 아직 입력하지 않았어요)'));
       if (w.memo) card.append(h('div', { class: 'hint' }, w.memo));
       if (isIncomplete(w)) card.append(h('button', {
         class: 'btn small',
@@ -152,12 +155,13 @@ function renderList(body, words, view) {
     const q = search.value.trim().toLowerCase();
     const rows = [...words].sort((a, b) => b.addedAt - a.addedAt)
       .filter(w => listFilter !== 'todo' || isIncomplete(w))
-      .filter(w => !q || [w.word, w.reading, w.meaning].some(s => (s || '').toLowerCase().includes(q)));
+      .filter(w => !q || [w.word, shown(w).reading, shown(w).meaning].some(s => (s || '').toLowerCase().includes(q)));
     list.replaceChildren(...(rows.length ? rows.map(w => h('div', { class: 'word' },
       h('div', { class: 'info' },
-        h('div', {}, h('span', { class: 'w jp' }, w.word), w.reading ? h('span', { class: 'sub jp' }, `  ${w.reading}`) : null,
-          isIncomplete(w) ? h('span', { class: 'badge' }, '미완성') : null),
-        w.meaning ? h('div', {}, w.meaning) : h('div', { class: 'sub' }, '(뜻 없음)'),
+        h('div', {}, h('span', { class: 'w jp' }, w.word), shown(w).reading && !shown(w).fromCard ? h('span', { class: 'sub jp' }, `  ${shown(w).reading}`) : null,
+          isIncomplete(w) ? h('span', { class: 'badge' }, '미완성') : (cardFor(w) ? h('span', { class: 'badge link' }, '카드 연결') : null)),
+        shown(w).fromCard && shown(w).reading ? h('div', { class: 'sub jp' }, shown(w).reading) : null,
+        shown(w).meaning ? h('div', {}, shown(w).meaning) : h('div', { class: 'sub' }, '(뜻 없음)'),
         kanjiChips(w.word),
         h('div', { class: 'sub' }, `본 횟수 ${w.seen || 0} · 몰라요 ${w.miss || 0}`)),
       h('button', { class: 'btn small', onclick: () => openWordModal({ id: w.id, ...w }, () => renderVocab(view)) }, '✏️'),
