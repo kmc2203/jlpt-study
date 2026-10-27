@@ -22,6 +22,11 @@ class KanjiData(unittest.TestCase):
         self.assertEqual(len(g2), 160)
         self.assertEqual(len(set(g2)), 160)
 
+    def test_grade3_has_200(self):
+        g3 = [c["k"] for c in cards() if c["grade"] == 3]
+        self.assertEqual(len(g3), 200)
+        self.assertEqual(len(set(g3)), 200)
+
     def test_every_card_is_complete(self):
         seen = set()
         for c in cards():
@@ -30,7 +35,7 @@ class KanjiData(unittest.TestCase):
             self.assertNotIn(k, seen, f"중복 {k}"); seen.add(k)
             self.assertRegex(c["hunum"], r"^[가-힣 ]+ [가-힣](\([가-힣]\))?$", k)
             self.assertTrue(c["meaning"] and all(c["meaning"]), k)
-            self.assertTrue(c["on"], f"{k}: 음독 없음")
+            self.assertTrue(c["on"] or c["kun"], f"{k}: 음독·훈독이 모두 없음")
             self.assertIsInstance(c["kun"], list, k)
             self.assertTrue(1 <= c["radical"] <= 214 and c["radical_ch"], k)
             self.assertGreater(c["strokes"], 0, k)
