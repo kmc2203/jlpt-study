@@ -45,7 +45,11 @@ def main(db, src, out):
             errs.append(f"{lit}: 훈음 형식 오류 {a['hunum']!r}")
             continue
         sound = m.group(2)
-        if sound not in hangul:
+        if not hangul:
+            warns.append(f"{lit}: 사전에 한국 한자음이 없어 훈음의 한자음 {sound!r} 은 대조하지 못함")
+        elif sound not in hangul and a.get("sound_override"):
+            warns.append(f"{lit}: 한자음 {sound!r} 은 사전({hangul})과 다르지만 예외 허용 — {a['sound_override']}")
+        elif sound not in hangul:
             errs.append(f"{lit}: 훈음의 한자음 {sound!r} 가 사전({hangul})에 없음")
         bad = [k for k in a["kun"] if k not in kun_all]
         if bad:
