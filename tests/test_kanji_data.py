@@ -27,6 +27,11 @@ class KanjiData(unittest.TestCase):
         self.assertEqual(len(g3), 200)
         self.assertEqual(len(set(g3)), 200)
 
+    def test_grade4_has_220(self):
+        g4 = [c["k"] for c in cards() if c["grade"] == 4]
+        self.assertEqual(len(g4), 220)
+        self.assertEqual(len(set(g4)), 220)
+
     def test_every_card_is_complete(self):
         seen = set()
         for c in cards():
