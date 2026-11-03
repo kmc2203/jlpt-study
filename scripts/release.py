@@ -5,6 +5,7 @@
     python scripts/release.py --count 10     # 10개 공개
     python scripts/release.py --count 0      # 공개는 하지 않고 batches 목록만 동기화
     python scripts/release.py --force        # 오늘 이미 공개했어도 한 번 더 공개
+    python scripts/release.py --batch pool/batch-004.json   # 그 batch 의 미공개 문제를 전부 오늘 공개
 
 - 같은 날 두 번 실행해도 중복 공개되지 않는다(--force 제외).
 - 유형(문법/어휘/독해…)이 한쪽으로 몰리지 않도록 유형별로 번갈아 고른다.
@@ -62,6 +63,7 @@ def main():
     ap.add_argument("--count", type=int, default=int(os.environ.get("DAILY_COUNT", "5") or 5))
     ap.add_argument("--date", default=datetime.now(KST).strftime("%Y-%m-%d"))
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--batch", help="이 batch 파일(예: pool/batch-004.json)의 미공개 문제를 전부 공개 — 평일 자동 생성용")
     args = ap.parse_args()
 
     pool = load_pool()
@@ -76,7 +78,16 @@ def main():
     released_by_type = Counter(by_type[i] for i in released)
 
     new_ids = []
-    if args.count > 0:
+    if args.batch:
+        if args.batch not in batches:
+            print(f"::error::{args.batch} 가 문제 풀에 없습니다. 배치 목록: {batches}")
+            return 1
+        for b, it in pool:
+            if b == args.batch and it["id"] not in released:
+                released[it["id"]] = args.date
+                new_ids.append(it["id"])
+        updated = args.date
+    elif args.count > 0:
         if not args.force and args.date in released.values():
             print(f"{args.date} 분량은 이미 공개되어 있어 건너뜁니다. (--force 로 강제 가능)")
         else:

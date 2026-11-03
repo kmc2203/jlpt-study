@@ -170,7 +170,7 @@
     {
       "id": "or-003",
       "type": "orthography",
-      "level": "N2",
+      "level": "N3",
       "instruction": "下線の言葉を漢字で書くとき、最も適切なものを、1・2・3・4から一つ選びなさい。",
       "questions": [
         {
@@ -193,7 +193,7 @@
     {
       "id": "cx-001",
       "type": "context",
-      "level": "N2",
+      "level": "N3",
       "instruction": "（　）に入れるのに最も適切なものを、1・2・3・4から一つ選びなさい。",
       "questions": [
         {
@@ -262,7 +262,7 @@
     {
       "id": "cx-003",
       "type": "context",
-      "level": "N2",
+      "level": "N3",
       "instruction": "（　）に入れるのに最も適切なものを、1・2・3・4から一つ選びなさい。",
       "questions": [
         {
@@ -344,7 +344,7 @@
     {
       "id": "sy-002",
       "type": "synonym",
-      "level": "N2",
+      "level": "N3",
       "instruction": "下線の言葉に意味が最も近いものを、1・2・3・4から一つ選びなさい。",
       "questions": [
         {
@@ -432,7 +432,7 @@
     {
       "id": "us-002",
       "type": "usage",
-      "level": "N2",
+      "level": "N3",
       "instruction": "次の言葉の使い方として最も適切なものを、1・2・3・4から一つ選びなさい。",
       "questions": [
         {

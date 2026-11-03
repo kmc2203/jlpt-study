@@ -20,7 +20,7 @@ const backend = {
 
 export const DEFAULTS = {
   words: () => [],
-  progress: () => ({ done: {}, wrong: {}, stats: {}, days: {} }),
+  progress: () => ({ done: {}, wrong: {}, stats: {}, days: {}, recent: {} }),
   settings: () => ({ furigana: false }),
   cycle: () => null,
   kanjiLinks: () => ({}), // { 한자 한 글자: nihongokanji.com 페이지 주소 }

@@ -55,6 +55,15 @@ class ValidateTest(unittest.TestCase):
         code, out = run([good_grammar(), good_order()])
         self.assertEqual(code, 0, out)
 
+    def test_level_is_required_and_accepts_n5_to_n2(self):
+        for lv in ("N5", "N4", "N3", "N2"):
+            g = good_grammar(); g["level"] = lv
+            self.assertEqual(run([g])[0], 0, lv)
+        g = good_grammar(); del g["level"]
+        self.assertEqual(run([g])[0], 1, "level 이 없으면 오류")
+        g = good_grammar(); g["level"] = "N1"
+        self.assertEqual(run([g])[0], 1, "N1 은 허용하지 않음")
+
     def test_answer_out_of_range(self):
         g = good_grammar(); g["questions"][0]["answer"] = 4
         self.assertEqual(run([g])[0], 1)

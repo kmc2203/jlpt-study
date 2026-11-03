@@ -22,7 +22,12 @@ async function setup() {
     fetch: async url => {
       try {
         const txt = await fs.readFile(path.join(ROOT, String(url)), 'utf8');
-        return { ok: true, status: 200, json: async () => JSON.parse(txt) };
+        const body = JSON.parse(txt);
+        // 실제 manifest 는 매일 공개가 늘어 풀이 소진될 수 있으니, 테스트에서는 일부만 공개된 상태로 고정한다
+        if (String(url) === 'data/manifest.json') {
+          body.released = Object.fromEntries(Object.entries(body.released).sort().slice(0, 24));
+        }
+        return { ok: true, status: 200, json: async () => body };
       } catch { return { ok: false, status: 404 }; }
     },
   });
@@ -420,6 +425,80 @@ test('문제 화면에서 한자 한 글자를 선택하면 「한자 카드」 
   await waitFor(() => document.querySelector('.modal .kcard'), '카드 열림');
   assert.ok(document.querySelector('.modal .kcard').textContent.includes('쉴 휴'));
   assert.equal(bar.hidden, true, '카드를 열면 바는 닫힘');
+
+  // 카드를 닫으면 방금 고른 글자가 그대로 선택돼 있고 바도 다시 뜬다
+  await clickBtn('닫기');
+  await waitFor(() => !bar.hidden, '카드를 닫은 뒤 바 복귀');
+  assert.equal(window.getSelection().toString(), '休', '선택 유지');
+  assert.ok(bar.textContent.includes('休'));
+  assert.equal(cardBtn.hidden, false);
+  // 안드로이드가 선택을 풀어 버려도 바와 글자는 유지된다
+  window.getSelection().removeAllRanges();
+  document.dispatchEvent(new window.Event('selectionchange'));
+  await sleep(300);
+  assert.equal(bar.hidden, false, '선택이 풀려도 바는 유지');
+  // 화면의 다른 곳을 누르면 평소처럼 사라진다
+  p.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
+  await waitFor(() => bar.hidden, '다른 곳을 누르면 바 사라짐');
+});
+
+test('문제 화면에 급수(N5~N2) 배지가 표시된다', { skip: !JSDOM }, async () => {
+  const { view } = await setup();
+  const { renderQuizHome } = await import('../js/quiz.js');
+  await renderQuizHome(view);
+  await clickBtn('시작');
+  await waitFor(() => document.querySelector('.choice'), '선택지');
+  const lv = document.querySelector('.tag.lv');
+  assert.ok(lv && /^N[2-5]$/.test(lv.textContent), '급수 배지: ' + lv?.textContent);
+});
+
+test('통계: 약한 유형이 맨 위에 오고, 집중 풀기로 해당 유형 문제가 시작된다', { skip: !JSDOM }, async () => {
+  const { view } = await setup();
+  const { load, commit } = await import('../js/storage.js');
+  const { renderStats } = await import('../js/stats.js');
+  const p = await load('progress');
+  p.stats = { grammar: { n: 10, ok: 3 }, kanji_reading: { n: 10, ok: 9 }, synonym: { n: 2, ok: 0 } };
+  p.recent = { grammar: [0, 0, 1, 0, 1, 0, 0, 1, 0, 0] };
+  const { todayStr } = await import('../js/util.js');
+  p.days[todayStr()] = 22;
+  await commit('progress');
+  await renderStats(view);
+  const rows = [...view.querySelectorAll('.bars')][0].children;
+  assert.match(rows[0].textContent, /문법 형식/, '가장 약한 유형이 맨 위');
+  assert.match(view.textContent, /보강 필요/); assert.match(view.textContent, /강점/); assert.match(view.textContent, /표본 부족/);
+  assert.match(view.textContent, /지금 보강할 곳/);
+  assert.ok(view.querySelector('.rx')?.textContent.includes('문법 형식'), '처방 카드에 문법 형식');
+  assert.ok(view.textContent.includes('급수별 정답률'));
+  // 집중 풀기 → 퀴즈 홈이 같은 유형 문제로 바로 시작
+  const { renderQuizHome } = await import('../js/quiz.js');
+  [...view.querySelectorAll('.rx button')][0].click();
+  assert.equal(window.location.hash, '#/quiz');
+  await renderQuizHome(view);
+  await waitFor(() => document.querySelector('.choice'), '집중 풀기 첫 문제');
+  assert.match(document.querySelector('.tag:not(.lv)').textContent, /문법 형식/);
+});
+
+test('통계: 분석용 요약에는 유형·급수·단어가 들어가고 개인 식별 정보는 없다', { skip: !JSDOM }, async () => {
+  await setup();
+  const { load, commit } = await import('../js/storage.js');
+  const { computeStats, buildSummary } = await import('../js/stats.js');
+  const { loadData } = await import('../js/data.js');
+  const { addWord, allWords } = await import('../js/words.js');
+  const d = await loadData();
+  const first = d.items[0];
+  const p = await load('progress');
+  p.stats = { [first.type]: { n: 4, ok: 1 } };
+  p.done[first.id] = { at: 1, res: first.questions.map(() => false) };
+  p.wrong[first.id] = true;
+  await commit('progress');
+  await addWord({ word: '納める', reading: 'おさめる', meaning: '납부하다', source: 'quiz:' + first.id });
+  const st = computeStats(p, d, await allWords());
+  const sum = buildSummary(st, await allWords(), d);
+  assert.equal(sum.byType[0].type, first.type);
+  assert.ok(sum.byLevel[first.level || 'N2'].n >= 1);
+  assert.equal(sum.wordsSavedWhileSolvingByType[first.type], 1);
+  assert.equal(sum.words[0].word, '納める');
+  assert.ok(!JSON.stringify(sum).includes('@'), '이메일 등 식별 정보 없음');
 });
 
 test('마크업과 sanitizer', { skip: !JSDOM }, async () => {

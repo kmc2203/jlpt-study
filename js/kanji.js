@@ -54,7 +54,7 @@ export function kanjiCard(c) {
       h('li', {}, h('span', { class: 'jp kw' }, w.w), h('span', { class: 'sub' }, ` ${w.r} `), '— ' + w.m))));
 }
 
-export async function openKanjiSheet(k, onChange) {
+export async function openKanjiSheet(k, onChange, modalOpts) {
   const links = await load('kanjiLinks');
   const card = (await loadKanjiDb()).cards.get(k);
   const saved = links[k];
@@ -85,5 +85,5 @@ export async function openKanjiSheet(k, onChange) {
       links[k] = u; await commit('kanjiLinks'); toast('저장했어요'); onChange?.();
     },
   });
-  openModal(`한자 「${k}」`, body, buttons);
+  openModal(`한자 「${k}」`, body, buttons, modalOpts);
 }

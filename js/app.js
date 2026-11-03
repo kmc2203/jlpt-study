@@ -7,10 +7,11 @@ import { renderQuizHome } from './quiz.js';
 import { renderVocab } from './vocab.js';
 import { initSelectionBar, refreshSelectionBar } from './select.js';
 import { renderKanjiList } from './kanjilist.js';
+import { renderStats } from './stats.js';
 import { loadKanjiDb } from './kanjidb.js';
 import { openModal } from './util.js';
 
-const TITLES = { home: 'JLPT N2 공부방', quiz: '문제 풀이', vocab: '단어 오답노트', settings: '설정', kanji: '한자 카드' };
+const TITLES = { home: 'JLPT N2 공부방', quiz: '문제 풀이', vocab: '단어 오답노트', settings: '설정', kanji: '한자 카드', stats: '통계' };
 
 async function applySettings() {
   const s = await load('settings');
@@ -54,7 +55,7 @@ async function renderHome(view) {
         h('a', { class: 'btn', href: '#/vocab', style: 'text-decoration:none' }, '단어 학습'),
         h('a', { class: 'btn primary', href: '#/quiz', style: 'text-decoration:none' }, '문제 풀기'))),
     h('div', { class: 'card' },
-      h('h2', {}, '유형별 정답률'),
+      h('div', { class: 'row between' }, h('h2', {}, '유형별 정답률'), h('a', { class: 'btn small', href: '#/stats', style: 'text-decoration:none' }, '취약점 분석')),
       types.length ? h('div', { class: 'bars' }, ...types.map(([t, s]) => {
         const pct = Math.round((s.ok / s.n) * 100);
         return h('div', { class: 'bar' },
@@ -144,6 +145,7 @@ async function route() {
     else if (name === 'vocab') await renderVocab(view);
     else if (name === 'settings') await renderSettings(view);
     else if (name === 'kanji') await renderKanjiList(view);
+    else if (name === 'stats') await renderStats(view);
     else await renderHome(view);
   } catch (e) {
     console.error(e);

@@ -21,7 +21,7 @@ JLPT N2 대비용 오리지널 문제를 JSON으로 만들어 줘.
 
 [조건]
 - 실제 기출 문장을 그대로 쓰지 말고, 기출과 같은 '형식·스타일'의 새 문장을 만든다.
-- 난이도는 N3~N2. 일상·직장·뉴스·안내문 등 실제 시험에 나올 만한 소재.
+- 난이도는 N3~N2 중심(가끔 N4). 각 아이템에 level(N5/N4/N3/N2)을 반드시 붙인다. 일상·직장·뉴스·안내문 등 실제 시험에 나올 만한 소재.
 - 이번 batch 파일 이름: batch-{번호}, 문제 수: {예: 24}개
 - 유형 분배(예): kanji_reading 3, orthography 3, context 3, synonym 2, usage 2, grammar 5, sentence_order 3, text_grammar 1(문항 3개), reading_short 1, reading_mid 1(문항 2개), info_search 1(문항 2개)
 - ID는 다음 번호부터 이어서 쓴다: {validate.py 가 알려준 '다음에 쓸 ID'}
@@ -37,7 +37,7 @@ JLPT N2 대비용 오리지널 문제를 JSON으로 만들어 줘.
 item = {
   "id": "gr-011",                       // 영문소문자 2~4자-숫자3자리. 중복 금지
   "type": "kanji_reading | orthography | context | synonym | usage | grammar | sentence_order | text_grammar | reading_short | reading_mid | reading_long | reading_integrated | reading_claim | info_search",
-  "level": "N3 | N2",
+  "level": "N5 | N4 | N3 | N2",     // 필수. 문제를 풀어야 하는 수준의 추정치 (화면에 배지로 표시)
   "instruction": "시험 지시문 (예: 次の文の（　）に入れるのに最も適切なものを、1・2・3・4から一つ選びなさい。)",
   "passage": "지문 텍스트 (독해/글의 문법용, 줄바꿈은 \n)",      // passage_html 과 둘 중 하나만
   "passage_html": "<table>…</table>",   // 메뉴판·안내문 등 표 형태 (허용: h3 p br table tr th td ul li b span)
@@ -78,3 +78,12 @@ question = {
 - **약한 유형만 집중**: 위 프롬프트의 유형 분배를 `grammar 12, sentence_order 8` 처럼 바꿔서 요청
 - **N2 문법 항목 순환**: `다음 문법 항목으로 문제를 만들어 줘: ～にわたって / ～をめぐって / ～ざるを得ない …`
 - **오답노트 연동**: 앱의 「단어 오답노트」 목록을 복사해 붙여넣고 `이 단어들이 자연스럽게 들어가는 문제를 만들어 줘`
+
+---
+
+## 평일 자동 생성 (Claude 예약 작업)
+
+- 평일 11시(KST) 전에 실행 → 새 아이템 10개를 새 batch 파일로 추가 → `validate.py` 통과 → `release.py --batch` 로 당일 공개 → 푸시(Actions 가 배포).
+- 기본 분배: kanji_reading 1, orthography 1, context 1, synonym 1, usage 1, grammar 3, sentence_order 1, 나머지 1개는 요일마다 text_grammar / reading_short / info_search 중 순환.
+- `docs/study_focus.json` 의 `weak_types` 에 든 유형은 위 분배에서 grammar 등을 줄이고 그 유형을 늘려 채운다(최대 4개).
+- 기존 batch 파일과 기존 문제는 수정하지 않는다. 검증이 3번 고쳐도 통과하지 않으면 푸시하지 않는다.

@@ -19,6 +19,9 @@ export const TYPES = {
   info_search: '정보 검색',
 };
 
+export const LEVELS = ['N5', 'N4', 'N3', 'N2'];
+export const levelOf = item => (LEVELS.includes(item?.level) ? item.level : 'N2');
+
 let cache;
 
 async function fetchJson(url) {

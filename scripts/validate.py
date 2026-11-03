@@ -24,7 +24,7 @@ TYPES = {
     "reading_short", "reading_mid", "reading_long", "reading_integrated", "reading_claim",
     "info_search",
 }
-LEVELS = {"N3", "N2"}
+LEVELS = {"N5", "N4", "N3", "N2"}
 ID_RE = re.compile(r"^[a-z]{2,4}-\d{3,}$")
 BLANK_RE = re.compile(r"（[\s　]*）")
 SLOT_RE = re.compile(r"＿{2,}|★")
@@ -148,8 +148,8 @@ def check_item(rep, where, item):
         rep.err(where, "id 형식은 'gr-001' 처럼 영문소문자 2~4자-숫자 3자리 이상")
     if item.get("type") not in TYPES:
         return rep.err(where, f"type 이 올바르지 않음: {item.get('type')}")
-    if item.get("level", "N2") not in LEVELS:
-        rep.err(where, "level 은 N3 또는 N2")
+    if item.get("level") not in LEVELS:
+        rep.err(where, "level 은 필수이며 N5, N4, N3, N2 중 하나여야 함")
     if "passage" in item and "passage_html" in item:
         rep.err(where, "passage 와 passage_html 은 동시에 쓸 수 없음")
     html = item.get("passage_html")

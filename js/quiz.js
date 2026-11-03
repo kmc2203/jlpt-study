@@ -1,10 +1,13 @@
 // 문제 풀이 화면: 시작 화면 → 세션(문제 → 해설 → 다음) → 결과
 import { $, h, fmt, sanitizeHtml, todayStr, toast, speak } from './util.js';
 import { load, commit } from './storage.js';
-import { TYPES, loadData, balancedPick, dailyAvailable, extraAvailable, wrongAvailable, unreleasedCount } from './data.js';
+import { TYPES, levelOf, loadData, balancedPick, dailyAvailable, extraAvailable, wrongAvailable, unreleasedCount } from './data.js';
 import { addWord, findWord } from './words.js';
 import { openWordModal } from './vocab.js';
 import { recentlySelected } from './select.js';
+
+let pendingDrill = null; // 통계 화면의 '이 유형 집중 풀기' 요청
+export const requestDrill = type => { pendingDrill = type; };
 
 let session = null; // { items, queue:[{item, qi}], pos, mode, results:{id:[bool]}, answered }
 
@@ -21,6 +24,15 @@ export async function renderQuizHome(view) {
   const today = todayStr();
   const daily = dailyAvailable(d, progress, today);
   const wrong = wrongAvailable(d, progress);
+
+  if (pendingDrill) {
+    const type = pendingDrill; pendingDrill = null;
+    // 틀렸던 문제 → 공개됐지만 안 푼 문제 → 아직 공개 전인 새 문제 순으로 최대 10문제
+    const pool = [...wrong, ...dailyAvailable(d, progress, today), ...extraAvailable(d, progress, type)].filter(i => i.type === type);
+    const items = [...new Map(pool.map(i => [i.id, i])).values()].slice(0, 10);
+    if (items.length) return start(items, 'drill');
+    toast('이 유형에서 풀 문제가 없어요. 문제가 새로 추가되면 다시 시도해 주세요.');
+  }
 
   const typeSel = h('select', {}, h('option', { value: '' }, '전체 유형'),
     ...Object.entries(TYPES).filter(([k]) => d.items.some(i => i.type === k)).map(([k, v]) => h('option', { value: k }, v)));
@@ -87,7 +99,9 @@ function renderQuestion() {
 
   view().replaceChildren(
     h('div', { class: 'row between' },
-      h('span', { class: 'tag' }, TYPES[item.type] || item.type),
+      h('span', { class: 'row' },
+        h('span', { class: 'tag lv lv-' + levelOf(item) }, levelOf(item)),
+        h('span', { class: 'tag' }, TYPES[item.type] || item.type)),
       h('span', { class: 'row' },
         h('span', { class: 'sub' }, `${session.pos + 1} / ${session.queue.length}`),
         h('button', { class: 'btn small', onclick: () => renderQuizHome(view()) }, '종료'))),
@@ -134,6 +148,9 @@ async function recordAnswer(item, qi, ok) {
   const p = await load('progress');
   const s = (p.stats[item.type] ||= { n: 0, ok: 0 });
   s.n += 1; if (ok) s.ok += 1;
+  // 최근 20문항의 결과(1=정답) — 통계 화면의 '요즘 추세'에 쓴다
+  const rec = ((p.recent ||= {})[item.type] ||= []);
+  rec.push(ok ? 1 : 0); if (rec.length > 20) rec.shift();
   const day = todayStr();
   p.days[day] = (p.days[day] || 0) + 1;
   // 아이템의 모든 문항을 마치면 '푼 문제'로 기록 (다시 출제되지 않음)

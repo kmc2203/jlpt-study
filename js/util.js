@@ -84,8 +84,9 @@ export function speak(text) {
 }
 
 // 하단 시트 모달. buttons: [{label, cls, onClick}] — onClick이 false를 반환하면 닫지 않음
-export function openModal(title, body, buttons = []) {
-  const close = () => overlay.remove();
+export function openModal(title, body, buttons = [], { onClose } = {}) {
+  let closed = false;
+  const close = () => { if (closed) return; closed = true; overlay.remove(); onClose?.(); };
   const overlay = h('div', { class: 'modal', onclick: e => { if (e.target === overlay) close(); } },
     h('div', { class: 'sheet' },
       h('h3', {}, title),

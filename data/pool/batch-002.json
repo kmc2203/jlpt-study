@@ -37,7 +37,7 @@
     {
       "id": "gr-002",
       "type": "grammar",
-      "level": "N2",
+      "level": "N3",
       "instruction": "次の文の（　）に入れるのに最も適切なものを、1・2・3・4から一つ選びなさい。",
       "questions": [
         {
@@ -96,7 +96,7 @@
     {
       "id": "gr-004",
       "type": "grammar",
-      "level": "N2",
+      "level": "N3",
       "instruction": "次の文の（　）に入れるのに最も適切なものを、1・2・3・4から一つ選びなさい。",
       "questions": [
         {
@@ -233,7 +233,7 @@
     {
       "id": "gr-008",
       "type": "grammar",
-      "level": "N2",
+      "level": "N3",
       "instruction": "次の文の（　）に入れるのに最も適切なものを、1・2・3・4から一つ選びなさい。",
       "questions": [
         {
@@ -270,7 +270,7 @@
     {
       "id": "gr-009",
       "type": "grammar",
-      "level": "N2",
+      "level": "N3",
       "instruction": "次の文の（　）に入れるのに最も適切なものを、1・2・3・4から一つ選びなさい。",
       "questions": [
         {
@@ -396,7 +396,7 @@
     {
       "id": "so-003",
       "type": "sentence_order",
-      "level": "N2",
+      "level": "N3",
       "instruction": "次の文の ★ に入る最も適切なものを、1・2・3・4から一つ選びなさい。",
       "questions": [
         {
@@ -422,7 +422,7 @@
     {
       "id": "so-004",
       "type": "sentence_order",
-      "level": "N2",
+      "level": "N3",
       "instruction": "次の文の ★ に入る最も適切なものを、1・2・3・4から一つ選びなさい。",
       "questions": [
         {
