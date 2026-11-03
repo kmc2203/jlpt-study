@@ -1,7 +1,7 @@
 // 앱 진입점: 해시 라우터 + 홈 + 설정
 import { $, h, todayStr, toast } from './util.js';
 import { load, commit, exportAll, importAll, resetAll, requestPersistence } from './storage.js';
-import { TYPES, loadData, dailyAvailable, wrongAvailable, unreleasedCount } from './data.js';
+import { TYPES, loadData, dailyAvailable, wrongAvailable, unreleasedCount, srsDue } from './data.js';
 import { allWords } from './words.js';
 import { renderQuizHome } from './quiz.js';
 import { renderVocab } from './vocab.js';
@@ -10,6 +10,8 @@ import { renderKanjiList } from './kanjilist.js';
 import { renderStats } from './stats.js';
 import { loadKanjiDb } from './kanjidb.js';
 import { openModal } from './util.js';
+import { pushSupported, currentSubscription, enablePush, disablePush } from './push.js';
+import { REPO } from './config.js';
 
 const TITLES = { home: 'JLPT N2 공부방', quiz: '문제 풀이', vocab: '단어 오답노트', settings: '설정', kanji: '한자 카드', stats: '통계' };
 
@@ -31,11 +33,12 @@ async function renderHome(view) {
   const progress = await load('progress');
   const words = await allWords();
   const today = todayStr();
-  let dailyN = '-', wrongN = Object.keys(progress.wrong).length;
+  let dailyN = '-', dueN = '-', wrongN = Object.keys(progress.wrong).length;
   try {
     const d = await loadData();
     dailyN = dailyAvailable(d, progress, today).length;
     wrongN = wrongAvailable(d, progress).length;
+    dueN = srsDue(d, progress, today).length;
   } catch { /* 오프라인 첫 실행 등 */ }
 
   const stat = (label, value) => h('div', { class: 'card grow', style: 'text-align:center;margin:0' },
@@ -49,7 +52,7 @@ async function renderHome(view) {
       stat('단어 오답노트', words.length)),
     h('div', { class: 'card' },
       h('h2', {}, '오늘 할 일'),
-      h('div', { class: 'sub' }, `풀 문제 ${dailyN}개 · 복습할 틀린 문제 ${wrongN}개`),
+      h('div', { class: 'sub' }, `풀 문제 ${dailyN}개 · 오늘의 복습 ${dueN}개 · 틀린 문제 전체 ${wrongN}개`),
       h('div', { class: 'row end' },
         h('a', { class: 'btn', href: '#/kanji', style: 'text-decoration:none' }, '한자 카드'),
         h('a', { class: 'btn', href: '#/vocab', style: 'text-decoration:none' }, '단어 학습'),
@@ -63,6 +66,36 @@ async function renderHome(view) {
           h('div', { class: 'track' }, h('i', { style: `width:${pct}%` })),
           h('span', { class: 'sub' }, `${pct}% (${s.ok}/${s.n})`));
       })) : h('div', { class: 'sub' }, '아직 푼 문제가 없어요. 오늘 첫 문제를 풀어 볼까요?')));
+}
+
+/* ───────── 푸시 알림 ───────── */
+async function buildPushCard() {
+  const box = h('div', { class: 'card' }, h('h3', {}, '학습 알림'));
+  if (!pushSupported()) {
+    box.append(h('div', { class: 'sub' }, '이 브라우저는 푸시 알림을 지원하지 않아요. 안드로이드 크롬에서 열어 주세요.'));
+    return box;
+  }
+  const out = h('div');
+  const paint = async () => {
+    const sub = await currentSubscription();
+    const info = sub ? JSON.stringify(sub.toJSON()) : '';
+    out.replaceChildren(
+      h('div', { class: 'sub' }, '하루 3번(오전 11:30 · 오후 3:30 · 밤 9:30) 알림이 와요. 알림은 GitHub Actions 가 보내기 때문에, 아래 구독 정보를 한 번 GitHub 에 등록해야 해요.'),
+      sub ? h('div', {},
+        h('div', { class: 'notice', style: 'margin:8px 0' }, '이 기기에서 알림이 켜져 있어요. 아래 구독 정보를 복사해 GitHub Secrets 의 PUSH_SUBSCRIPTIONS 에 붙여 넣으세요.'),
+        h('textarea', { readonly: true, rows: '4', style: 'width:100%;font-size:11px' }, info),
+        h('div', { class: 'row', style: 'margin-top:6px' },
+          h('button', { class: 'btn', onclick: async () => { try { await navigator.clipboard.writeText(info); toast('복사했어요'); } catch { toast('길게 눌러 직접 복사해 주세요'); } } }, '구독 정보 복사'),
+          h('a', { class: 'btn', style: 'text-decoration:none', target: '_blank', rel: 'noopener noreferrer',
+            href: `https://github.com/${REPO}/settings/secrets/actions` }, 'GitHub Secrets 열기'),
+          h('button', { class: 'btn ng', onclick: async () => { await disablePush(); toast('알림을 껐어요'); paint(); } }, '끄기')))
+        : h('button', { class: 'btn primary', style: 'margin-top:8px', onclick: async () => {
+            try { await enablePush(); toast('알림을 켰어요'); paint(); } catch (e) { toast(e.message); }
+          } }, '이 기기에서 알림 켜기'));
+  };
+  box.append(out);
+  await paint();
+  return box;
 }
 
 /* ───────── 출처·라이선스 ───────── */
@@ -95,6 +128,12 @@ async function renderSettings(view) {
       } catch (err) { toast('가져오기 실패: ' + err.message); }
     } });
 
+  const arr = h('input', { type: 'checkbox', checked: settings.arrange !== false ? true : null,
+    onchange: async e => { settings.arrange = e.target.checked; await commit('settings'); } });
+  const target = h('input', { type: 'number', min: '30', max: '100', step: '5', value: String(settings.target ?? 60), style: 'width:4.5em;margin:0 6px',
+    onchange: async e => { const v = Math.min(100, Math.max(30, Number(e.target.value) || 60)); e.target.value = v; settings.target = v; await commit('settings'); } });
+  const pushCard = await buildPushCard();
+
   let poolInfo = '';
   try {
     const d = await loadData();
@@ -107,7 +146,10 @@ async function renderSettings(view) {
   view.replaceChildren(
     h('div', { class: 'card' },
       h('h3', {}, '표시'),
-      h('label', { class: 'row' }, fur, '문제·해설에 후리가나 표시 (후리가나가 달린 문제만)')),
+      h('label', { class: 'row' }, fur, '문제·해설에 후리가나 표시 (후리가나가 달린 문제만)'),
+      h('label', { class: 'row', style: 'margin-top:8px' }, arr, '★ 문장 완성을 조각 배열로 풀기 (끄면 선택지 방식)'),
+      h('div', { class: 'row', style: 'margin-top:8px' }, '모의고사 목표 정답률', target, '%')),
+    pushCard,
     h('div', { class: 'card' },
       h('h3', {}, '문제 풀'), h('div', { class: 'sub' }, poolInfo)),
     h('div', { class: 'card' },

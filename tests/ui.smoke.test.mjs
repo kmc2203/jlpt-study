@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 let JSDOM;
 try { ({ JSDOM } = await import('jsdom')); } catch { /* jsdom 없으면 건너뜀 */ }
 
+const { todayStr } = await import('../js/util.js').catch(() => ({ todayStr: () => '' }));
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 async function setup() {
@@ -104,7 +105,13 @@ test('문제 풀이: 오늘의 문제 → 풀이 → 해설 → 결과, 푼 문�
   // 다시 들어오면 오늘 분량이 0개, 푼 문제는 다시 나오지 않는다
   await renderQuizHome(view);
   assert.match(bodyText(), /오늘 분량은 모두 풀었어요/);
-  assert.ok(btn('복습 시작') && !btn('복습 시작').disabled, '틀린 문제 복습 가능');
+  const reviewBtns = [...document.querySelectorAll('button')].filter(b => b.textContent.trim() === '복습 시작');
+  assert.equal(reviewBtns.length, 2, '오늘의 복습 + 틀린 문제 복습');
+  assert.ok(reviewBtns[0].disabled, '방금 틀린 문제의 간격 복습은 내일부터');
+  assert.ok(!reviewBtns[1].disabled, '틀린 문제 복습 가능');
+  const p2 = await load('progress');
+  const { addDays } = await import('../js/util.js');
+  assert.ok(Object.keys(p2.wrong).every(id => p2.srs[id]?.step === 0 && p2.srs[id].due === addDays(todayStr(), 1)), '틀린 문제는 하루 뒤 복습 일정');
 
   // 더 풀기: 공개되지 않은 문제만, 이미 푼 문제는 제외
   const sel = [...document.querySelectorAll('select')].at(-1);
@@ -459,7 +466,6 @@ test('통계: 약한 유형이 맨 위에 오고, 집중 풀기로 해당 유형
   const p = await load('progress');
   p.stats = { grammar: { n: 10, ok: 3 }, kanji_reading: { n: 10, ok: 9 }, synonym: { n: 2, ok: 0 } };
   p.recent = { grammar: [0, 0, 1, 0, 1, 0, 0, 1, 0, 0] };
-  const { todayStr } = await import('../js/util.js');
   p.days[todayStr()] = 22;
   await commit('progress');
   await renderStats(view);
@@ -508,4 +514,216 @@ test('마크업과 sanitizer', { skip: !JSDOM }, async () => {
   assert.equal(plain('[[賛成]]と{漢字|かんじ}'), '賛成と漢字');
   const clean = sanitizeHtml('<table onclick="x()"><tr><td><a href="javascript:alert(1)">a</a><script>x</script></td></tr></table>');
   assert.ok(!/script|onclick|javascript:/i.test(clean), clean);
+});
+
+/* ───────── 간격 복습 · 조각 배열 · 모의고사 · 신고 · 해설 한자 ───────── */
+const typeSelect = () => [...document.querySelectorAll('select')].find(x => [...x.options].some(o => o.textContent === '전체 유형'));
+const findItem = (d, type) => d.items.find(i => i.type === type);
+
+test('간격 복습: 일정이 오늘인 문제만 오늘의 복습에 뜨고, 맞히면 다음 단계로 간다', { skip: !JSDOM }, async () => {
+  await setup();
+  await sleep(650);   // 앞 테스트의 글자 선택 직후 탭 방지(600ms)가 끝나길 기다린다
+  const { load, commit } = await import('../js/storage.js');
+  const { loadData, srsDue, SRS_STEPS } = await import('../js/data.js');
+  const { addDays } = await import('../js/util.js');
+  const d = await loadData();
+  const p = await load('progress');
+  const [a, b, c] = d.items;
+  const today = todayStr();
+  p.wrong[a.id] = true;                                        // 일정 없는 기존 틀린 문제 → 오늘 복습
+  p.wrong[b.id] = true; p.srs[b.id] = { step: 1, due: addDays(today, 2) };   // 아직 아님
+  p.srs[c.id] = { step: 0, due: addDays(today, -1) };          // 이미 맞힌 뒤의 후속 복습, 도래
+  assert.deepEqual(srsDue(d, p, today).map(i => i.id).sort(), [a.id, c.id].sort());
+  assert.deepEqual(SRS_STEPS, [1, 3, 7, 14, 30]);
+  await commit('progress');
+
+  const { renderQuizHome } = await import('../js/quiz.js');
+  const view = document.getElementById('view');
+  await renderQuizHome(view);
+  assert.match(view.textContent, /복습할 문제 2개/);
+  // c 를 전부 맞히면 다음 단계(3일 뒤)
+  const dueBtn = [...view.querySelectorAll('button')].filter(x => x.textContent.trim() === '복습 시작')[0];
+  dueBtn.click();
+  for (let guard = 0; guard < 40; guard++) {
+    await waitFor(() => document.querySelector('.choice') || document.querySelector('.piece') || bodyText().includes('수고했어요'), '문제');
+    if (bodyText().includes('수고했어요')) break;
+    const sel = document.querySelector('.stem')?.textContent;
+    const all = d.items.flatMap(i => i.questions);
+    const q = all.find(x => document.querySelector('.stem')?.textContent.replace(/[\s　]/g, '') === x.stem.replace(/\[\[|\]\]/g, '').replace(/\{([^{}|]+)\|[^{}]+\}/g, '$1').replace(/[\s　]/g, '') || false);
+    if (document.querySelector('.piece')) { await setupArrangeOff(); }
+    const choices = [...document.querySelectorAll('.choice')];
+    if (!choices.length) throw new Error('선택지 없음: ' + sel);
+    const right = (q || findQuestion(d, sel, choices[0].textContent)).answer;
+    choices[right].click();
+    await waitFor(() => document.querySelector('.banner'), '해설');
+    await clickBtn(btn('다음 문제') ? '다음 문제' : '결과 보기');
+  }
+  const p2 = await load('progress');
+  assert.equal(p2.srs[c.id]?.step, 1, '맞히면 다음 단계');
+  assert.equal(p2.srs[c.id]?.due, addDays(todayStr(), SRS_STEPS[1]));
+  assert.equal(p2.wrong[a.id], undefined, '다 맞히면 틀린 문제 목록에서 빠짐');
+  assert.equal(p2.srs[a.id], undefined, '일정이 없던 문제는 일정도 안 생김');
+  async function setupArrangeOff() { throw new Error('이 테스트는 조각 배열 문제를 쓰지 않는 문제만 고른다'); }
+});
+
+test('★ 문장 완성: 조각을 눌러 배열하면 정답 처리되고, 끄면 선택지 방식으로 돌아간다', { skip: !JSDOM }, async () => {
+  const { view } = await setup();
+  const { loadData } = await import('../js/data.js');
+  const { load } = await import('../js/storage.js');
+  const d = await loadData();
+  const item = findItem(d, 'sentence_order');
+  const q = item.questions[0];
+  const { renderQuizHome } = await import('../js/quiz.js');
+  const { default: _ } = { default: 0 };
+  // 이 문제만 풀도록 '더 풀기'는 못 쓰니, 풀의 sentence_order 가 나올 때까지 유형을 골라 시작
+  await renderQuizHome(view);
+  const sel = typeSelect();
+  sel.value = 'sentence_order'; sel.dispatchEvent(new window.Event('change'));
+  [...document.querySelectorAll('select')].at(-1).value = '5';
+  await clickBtn('더 풀기');
+  await waitFor(() => document.querySelector('.piece'), '조각');
+  assert.equal(document.querySelectorAll('.piece').length, 4);
+  assert.equal(document.querySelector('.choice'), null, '선택지 방식이 아님');
+  const stemText = document.querySelector('.stem').textContent;
+  const owner = d.items.find(i => i.type === 'sentence_order' && i.questions.some(x => x.choices.every(c => document.body.textContent.includes(c.replace(/\[\[|\]\]/g, '')))));
+  const cur = owner.questions.find(x => x.choices.every(c => document.body.textContent.includes(c.replace(/\[\[|\]\]/g, ''))));
+  assert.ok(btn('확인').disabled, '다 채우기 전엔 확인 불가');
+  const pieces = [...document.querySelectorAll('.piece')];
+  // 일부러 한 칸 틀리게: 정답 순서에서 앞 두 조각을 바꿔 넣는다
+  const wrongOrder = [...cur.order]; [wrongOrder[0], wrongOrder[1]] = [wrongOrder[1], wrongOrder[0]];
+  for (const i of wrongOrder) pieces[i].click();
+  assert.ok(!btn('확인').disabled);
+  // 넣은 조각을 눌러 빼고 다시 올바르게
+  document.querySelectorAll('.slot.arr')[0].click();
+  assert.ok(btn('확인').disabled, '조각을 빼면 다시 비활성');
+  document.querySelectorAll('.slot.arr')[1].click();
+  for (const i of [cur.order[0], cur.order[1]]) pieces[i].click();
+  btn('확인').click();
+  await waitFor(() => document.querySelector('.banner'), '해설');
+  assert.match(document.querySelector('.banner').textContent, /정답/);
+  assert.equal(document.querySelectorAll('.slot.arr.right').length, 4);
+  assert.ok(stemText.includes('★'));
+  const p = await load('progress');
+  assert.equal(p.stats.sentence_order.n, 1);
+});
+
+test('★ 문장 완성: 틀리게 배열하면 오답이고, 선택지 방식 전환 버튼이 있다', { skip: !JSDOM }, async () => {
+  const { view } = await setup();
+  const { loadData } = await import('../js/data.js');
+  const d = await loadData();
+  const { renderQuizHome } = await import('../js/quiz.js');
+  await renderQuizHome(view);
+  const sel = typeSelect();
+  sel.value = 'sentence_order'; sel.dispatchEvent(new window.Event('change'));
+  await clickBtn('더 풀기');
+  await waitFor(() => document.querySelector('.piece'), '조각');
+  const cur = d.items.filter(i => i.type === 'sentence_order').flatMap(i => i.questions)
+    .find(x => x.choices.every(c => document.body.textContent.includes(c.replace(/\[\[|\]\]/g, ''))));
+  const pieces = [...document.querySelectorAll('.piece')];
+  const bad = [...cur.order].reverse();
+  for (const i of bad) pieces[i].click();
+  btn('확인').click();
+  await waitFor(() => document.querySelector('.banner'), '해설');
+  assert.match(document.querySelector('.banner').textContent, /오답/);
+  assert.ok(document.querySelectorAll('.slot.arr.miss').length >= 1);
+  await clickBtn('다음 문제').catch(() => {});
+});
+
+test('모의고사: 시험 비율로 구성되고, 풀이 중엔 해설이 없고, 끝나면 영역별 결과와 목표 비교가 나온다', { skip: !JSDOM }, async () => {
+  const { view } = await setup();
+  const { loadData, buildExam, groupOf } = await import('../js/data.js');
+  const { load } = await import('../js/storage.js');
+  const d = await loadData();
+  const progress = await load('progress');
+  const exam = buildExam(d, progress, 20, () => 0.5);
+  const qn = exam.reduce((a, i) => a + i.questions.length, 0);
+  assert.ok(qn >= 18 && qn <= 24, '문항 수 ' + qn);
+  const order = exam.map(i => ['vocab', 'grammar', 'reading'].indexOf(groupOf(i.type)));
+  assert.deepEqual(order, [...order].sort(), '어휘 → 문법 → 독해 순');
+  assert.equal(new Set(exam.map(i => i.id)).size, exam.length, '중복 없음');
+
+  const { renderQuizHome } = await import('../js/quiz.js');
+  await renderQuizHome(view);
+  const examSelect = [...document.querySelectorAll('select')].find(s => [...s.options].some(o => o.textContent.includes('분')));
+  examSelect.value = '10';
+  const startBtn = examSelect.parentElement.parentElement.querySelector('button');
+  startBtn.click();
+  let n = 0;
+  for (let guard = 0; guard < 60; guard++) {
+    await waitFor(() => document.querySelector('.choice') || bodyText().includes('모의고사 결과'), '문제 또는 결과');
+    if (bodyText().includes('모의고사 결과')) break;
+    assert.ok(document.getElementById('examTimer'), '타이머 표시');
+    document.querySelectorAll('.choice')[0].click();
+    assert.equal(document.querySelector('.choice.correct'), null, '모의고사에서는 정답 표시 없음');
+    assert.equal(document.querySelector('.banner'), null, '해설 없음');
+    n++;
+    await sleep(300);
+  }
+  await waitFor(() => bodyText().includes('모의고사 결과'), '결과');
+  assert.ok(n >= 8);
+  assert.match(bodyText(), /목표와 비교/);
+  assert.match(bodyText(), /문자·어휘|문법|독해/);
+  await waitFor(() => /60%/.test(document.getElementById('examTarget')?.textContent || ''), '목표 표시');
+  assert.match(document.getElementById('examTarget').textContent, /달성|미달/);
+  const p = await load('progress');
+  assert.ok(Object.keys(p.done).length >= 1, '푼 기록은 일반 풀이와 같이 남음');
+});
+
+test('문제 신고: 저장되고, 이슈 주소에 문제 정보가 담긴다', { skip: !JSDOM }, async () => {
+  const { view } = await setup();
+  const { load } = await import('../js/storage.js');
+  const { reportIssueUrl, REPORT_REASONS } = await import('../js/quiz.js');
+  const { loadData } = await import('../js/data.js');
+  const d = await loadData();
+  const it = d.items[0];
+  const u = new URL(reportIssueUrl(it, 0, REPORT_REASONS[0], '정답이 둘이에요'));
+  assert.equal(u.hostname, 'github.com');
+  assert.match(u.pathname, /^\/kmc2203\/jlpt-study\/issues\/new$/);
+  assert.ok(u.searchParams.get('title').startsWith('[문제 신고] ' + it.id));
+  assert.ok(u.searchParams.get('body').includes(it.questions[0].choices[0]));
+  assert.ok(u.searchParams.get('body').includes('정답이 둘이에요'));
+
+  const { renderQuizHome } = await import('../js/quiz.js');
+  await renderQuizHome(view);
+  await clickBtn('시작');
+  await waitFor(() => document.querySelector('.choice'), '문제');
+  document.querySelector('.choice').click();
+  await waitFor(() => btn('🚩 문제 신고'), '신고 버튼');
+  btn('🚩 문제 신고').click();
+  await waitFor(() => document.querySelector('.modal textarea'), '신고 창');
+  document.querySelector('.modal textarea').value = '어색해요';
+  await clickBtn('저장만');
+  await waitFor(() => !document.querySelector('.modal'), '창 닫힘');
+  const r = await load('reports');
+  assert.equal(r.length, 1);
+  assert.equal(r[0].memo, '어색해요');
+});
+
+test('해설 속 한자(카드가 있는 것)를 누르면 한자 카드가 열린다', { skip: !JSDOM }, async () => {
+  const { view } = await setup();
+  const { loadKanjiDb } = await import('../js/kanjidb.js');
+  await loadKanjiDb();
+  const { linkKanji } = await import('../js/kanji.js');
+  const box = document.createElement('div');
+  box.innerHTML = '<div>休日に<ruby>勉<rt>べん</rt></ruby>強。ABC</div>';
+  view.append(box);
+  linkKanji(box);
+  const links = [...box.querySelectorAll('.kk-link')].map(x => x.textContent);
+  assert.deepEqual(links, ['休', '日', '勉', '強'].filter(k => links.includes(k)), '카드가 있는 한자만 링크');
+  assert.ok(links.includes('休') && links.includes('日'));
+  assert.equal(box.querySelector('rt').textContent, 'べん', '후리가나는 건드리지 않음');
+  box.querySelector('.kk-link').click();
+  await waitFor(() => document.querySelector('.modal .kcard'), '카드');
+  await clickBtn('닫기');
+});
+
+test('알림 발송: 시간대 판정과 구독 파싱, 구독이 없으면 조용히 끝난다', async () => {
+  const m = await import('../scripts/send_push.mjs');
+  assert.equal(m.slotAt(new Date('2026-11-03T02:30:00Z')), 'morning');   // 11:30 KST
+  assert.equal(m.slotAt(new Date('2026-11-03T06:30:00Z')), 'afternoon'); // 15:30 KST
+  assert.equal(m.slotAt(new Date('2026-11-03T12:30:00Z')), 'night');     // 21:30 KST
+  assert.equal(m.parseSubscriptions('').length, 0);
+  assert.equal(m.parseSubscriptions('{"endpoint":"https://x","keys":{"p256dh":"a","auth":"b"}}').length, 1);
+  assert.equal(m.parseSubscriptions('[{"endpoint":"https://x"},{"endpoint":"https://y","keys":{"p256dh":"a","auth":"b"}}]').length, 1, '키가 없는 구독은 버림');
+  assert.ok(Object.values(m.MESSAGES).every(x => x.title && x.body));
 });

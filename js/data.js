@@ -76,4 +76,45 @@ export function wrongAvailable(d, progress) {
   return Object.keys(progress.wrong).map(id => d.byId.get(id)).filter(Boolean);
 }
 
+// 간격 반복: 틀린 문제는 하루 뒤 → 3 → 7 → 14 → 30일 뒤에 다시 나오고, 그때마다 맞히면 다음 단계로
+export const SRS_STEPS = [1, 3, 7, 14, 30];
+
+// 오늘 복습할 문제: 일정이 오늘 이전인 것 + 아직 일정이 없는 틀린 문제(기존 기록)
+export function srsDue(d, progress, today) {
+  const ids = new Set();
+  for (const id of Object.keys(progress.wrong || {})) if (!progress.srs?.[id]) ids.add(id);
+  for (const [id, s] of Object.entries(progress.srs || {})) if (s.due <= today) ids.add(id);
+  return [...ids].map(id => d.byId.get(id)).filter(Boolean);
+}
+
+// 모의고사 구성: 어휘 35% · 문법 35% · 독해 30% (문항 수 기준), 안 푼 문제를 먼저. 시험처럼 어휘 → 문법 → 독해 순.
+export const EXAM_GROUPS = [
+  { key: 'vocab', label: '문자·어휘', w: 0.35, types: ['kanji_reading', 'orthography', 'context', 'synonym', 'usage'] },
+  { key: 'grammar', label: '문법', w: 0.35, types: ['grammar', 'sentence_order', 'text_grammar'] },
+  { key: 'reading', label: '독해', w: 0.30, types: ['reading_short', 'reading_mid', 'reading_long', 'reading_integrated', 'reading_claim', 'info_search'] },
+];
+export const groupOf = type => EXAM_GROUPS.find(g => g.types.includes(type))?.key;
+
+export function buildExam(d, progress, nQuestions, rnd = Math.random) {
+  const shuffle = a => { const x = [...a]; for (let i = x.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [x[i], x[j]] = [x[j], x[i]]; } return x; };
+  const fresh = it => (progress.done[it.id] ? 1 : 0);
+  const used = new Set(), out = [];
+  const take = (pool, target) => {
+    let n = 0;
+    for (const it of pool) {
+      if (n >= target) break;
+      if (used.has(it.id) || n + it.questions.length > target + 2) continue;
+      used.add(it.id); out.push(it); n += it.questions.length;
+    }
+    return n;
+  };
+  const byGroup = Object.fromEntries(EXAM_GROUPS.map(g => [g.key,
+    shuffle(d.items.filter(i => g.types.includes(i.type))).sort((a, b) => fresh(a) - fresh(b))]));
+  let got = 0;
+  for (const g of EXAM_GROUPS) got += take(byGroup[g.key], Math.round(nQuestions * g.w));
+  if (got < nQuestions) got += take(shuffle(d.items).sort((a, b) => fresh(a) - fresh(b)), nQuestions - got);
+  const rank = Object.fromEntries(EXAM_GROUPS.map((g, i) => [g.key, i]));
+  return out.sort((a, b) => rank[groupOf(a.type)] - rank[groupOf(b.type)]);
+}
+
 export const unreleasedCount = d => d.items.filter(i => !d.released[i.id]).length;

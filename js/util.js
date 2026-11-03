@@ -62,6 +62,12 @@ export function sanitizeHtml(html) {
 export const todayStr = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+// 'YYYY-MM-DD' 에 n일을 더한 날짜 문자열
+export function addDays(str, n) {
+  const [y, m, d] = str.split('-').map(Number);
+  return todayStr(new Date(y, m - 1, d + n));
+}
+
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
 let toastTimer;

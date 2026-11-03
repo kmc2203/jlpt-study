@@ -178,3 +178,16 @@ details summary{cursor:pointer;color:var(--pri);font-size:14px;padding:6px 0}
 .daybars{display:flex;align-items:flex-end;gap:4px;height:90px}
 .daycol{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;font-size:10px;color:var(--sub,#778)}
 .daycol i{display:block;width:100%;min-height:2px;border-radius:3px 3px 0 0;background:var(--pri)}
+
+/* ★ 조각 배열 */
+.slot.arr{display:inline-block;min-width:3.2em;padding:0 6px;border-bottom:2px solid var(--pri);text-align:center;cursor:pointer;border-radius:4px 4px 0 0}
+.slot.arr.filled{background:var(--pri-weak)}
+.slot.arr.right{background:#e4f6ec;border-color:#2e9b5f}
+.slot.arr.miss{background:#fde4e4;border-color:#d64545}
+.pieces{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.piece{padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);cursor:pointer;font-size:17px;user-select:text}
+.piece.used{opacity:.35}
+.piece.locked{pointer-events:none}
+.choice.picked{border-color:var(--pri);background:var(--pri-weak)}
+.timer{font-variant-numeric:tabular-nums;font-weight:700;color:var(--pri)}
+.kk-link{border-bottom:1px dotted var(--pri);cursor:pointer}

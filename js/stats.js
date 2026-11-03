@@ -1,7 +1,7 @@
 // 통계 대시보드: 어디가 약한지 한눈에 보고, 바로 집중 연습으로 이어 준다.
 import { h, todayStr, toast, openModal } from './util.js';
 import { load } from './storage.js';
-import { TYPES, LEVELS, levelOf, loadData } from './data.js';
+import { TYPES, LEVELS, levelOf, loadData, srsDue } from './data.js';
 import { allWords } from './words.js';
 import { requestDrill } from './quiz.js';
 
@@ -128,7 +128,7 @@ export async function renderStats(view) {
       h('button', { class: 'btn block', style: 'margin-top:8px', onclick: () => shareSummary(st, words, data) }, '분석용 요약 복사')));
 }
 
-export function buildSummary(st, words, data) {
+export function buildSummary(st, words, data, extra = {}) {
   return {
     app: 'jlpt-study-summary', version: 1, date: todayStr(),
     total: { n: st.total, ok: st.totalOk, pct: pctOf(st.totalOk, st.total) },
@@ -138,11 +138,15 @@ export function buildSummary(st, words, data) {
     last14Days: st.days,
     words: words.slice(0, 200).map(w => ({ word: w.word, reading: w.reading, meaning: w.meaning, source: (w.source || '').replace(/^quiz:.*/, 'quiz'), miss: w.miss || 0 })),
     poolSize: data ? data.items.length : null,
+    srsDueToday: extra.srsDue ?? null,
+    reports: (extra.reports || []).slice(-30).map(r => ({ id: r.id, q: r.qi + 1, reason: r.reason, memo: r.memo })),
   };
 }
 
 async function shareSummary(st, words, data) {
-  const text = JSON.stringify(buildSummary(st, words, data), null, 1);
+  const progress = await load('progress');
+  const extra = { srsDue: data ? srsDue(data, progress, todayStr()).length : null, reports: await load('reports') };
+  const text = JSON.stringify(buildSummary(st, words, data, extra), null, 1);
   try { await navigator.clipboard.writeText(text); toast('복사했어요. 채팅에 붙여넣어 주세요'); return; } catch { /* 아래 수동 복사 */ }
   const ta = h('textarea', { readonly: true, rows: '10', style: 'width:100%;font-size:12px' }, text);
   openModal('분석용 요약', h('div', {}, h('div', { class: 'sub' }, '아래 내용을 길게 눌러 전체 선택 → 복사하세요.'), ta), [{ label: '닫기' }]);

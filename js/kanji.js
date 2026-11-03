@@ -6,7 +6,7 @@
 import { h, toast, openModal } from './util.js';
 import { load, commit } from './storage.js';
 import { kanjiOf } from './words.js';
-import { loadKanjiDb, showReading, gradeLabel } from './kanjidb.js';
+import { loadKanjiDb, showReading, gradeLabel, cardSync } from './kanjidb.js';
 
 export const searchUrl = k => `https://www.google.com/search?q=${encodeURIComponent('site:nihongokanji.com ' + k)}`;
 
@@ -52,6 +52,30 @@ export function kanjiCard(c) {
     h('div', { class: 'klabel', style: 'margin-top:8px' }, '대표 단어'),
     h('ul', { class: 'kwords' }, ...c.words.map(w =>
       h('li', {}, h('span', { class: 'jp kw' }, w.w), h('span', { class: 'sub' }, ` ${w.r} `), '— ' + w.m))));
+}
+
+// root 안의 글자 중 한자 카드가 있는 한자를 눌러서 카드를 열 수 있게 한다 (후리가나·버튼·링크 안은 제외)
+export function linkKanji(root, { skip } = {}) {
+  if (!root) return;
+  const walker = document.createTreeWalker(root, window.NodeFilter.SHOW_TEXT, {
+    acceptNode: n => n.parentElement?.closest('rt,rp,button,a,.kk-link,input,textarea') ? window.NodeFilter.FILTER_REJECT : window.NodeFilter.FILTER_ACCEPT,
+  });
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const n of nodes) {
+    const text = n.nodeValue;
+    if (![...text].some(ch => cardSync(ch))) continue;
+    const frag = document.createDocumentFragment();
+    let buf = '';
+    for (const ch of text) {
+      if (cardSync(ch)) {
+        if (buf) { frag.append(buf); buf = ''; }
+        frag.append(h('span', { class: 'kk-link', onclick: () => { if (!skip?.()) openKanjiSheet(ch); } }, ch));
+      } else buf += ch;
+    }
+    if (buf) frag.append(buf);
+    n.replaceWith(frag);
+  }
 }
 
 export async function openKanjiSheet(k, onChange, modalOpts) {
