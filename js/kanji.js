@@ -7,6 +7,7 @@ import { h, toast, openModal } from './util.js';
 import { load, commit } from './storage.js';
 import { kanjiOf } from './words.js';
 import { loadKanjiDb, showReading, gradeLabel, cardSync } from './kanjidb.js';
+import { fillStrokes } from './strokes.js';
 
 export const searchUrl = k => `https://www.google.com/search?q=${encodeURIComponent('site:nihongokanji.com ' + k)}`;
 
@@ -42,10 +43,13 @@ export function kanjiChips(word) {
 // 한자 카드 본문 (카드 데이터가 있는 한자만)
 export function kanjiCard(c) {
   const row = (label, value) => h('div', { class: 'krow' }, h('span', { class: 'klabel' }, label), h('span', { class: 'jp' }, value));
+  const strokes = h('div', { class: 'kstroke-holder' });
+  fillStrokes(strokes, c.k);
   return h('div', { class: 'kcard' },
     h('div', { class: 'kanji-big jp' }, c.k),
     h('div', { class: 'khun' }, c.hunum),
     h('div', { class: 'row', style: 'justify-content:center;gap:6px;margin:4px 0 8px' }, ...c.meaning.map(m => h('span', { class: 'tag' }, m))),
+    strokes,
     row('음독', c.on.join('、') || '-'),
     row('훈독', c.kun.map(showReading).join('、') || '-'),
     row('부수·획수', `${c.radical_ch}(${c.radical}번) · ${c.strokes}획 · ${gradeLabel(c.grade)}`),

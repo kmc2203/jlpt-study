@@ -191,3 +191,17 @@ details summary{cursor:pointer;color:var(--pri);font-size:14px;padding:6px 0}
 .choice.picked{border-color:var(--pri);background:var(--pri-weak)}
 .timer{font-variant-numeric:tabular-nums;font-weight:700;color:var(--pri)}
 .kk-link{border-bottom:1px dotted var(--pri);cursor:pointer}
+
+/* 한자 획순·구성 풀이 */
+.kstroke-box{width:200px;height:200px;margin:6px auto 0;border:1px solid var(--line);border-radius:10px;background:var(--card);background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:50% 50%;background-position:center}
+.kstroke-svg{width:100%;height:100%;display:block}
+.ks{fill:none;stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round;transition:stroke .2s}
+.ks.off{stroke:var(--line);opacity:.8}
+.ks.done{stroke:var(--pri)}
+.ks.cur{stroke:#c0502d}
+.ks.dim{stroke:var(--line)}
+.ks.on{stroke:#c0502d}
+.kstroke-count{font-size:13px;color:var(--sub)}
+.kstory{text-align:left;background:var(--pri-weak);border-left:3px solid var(--pri);border-radius:8px;padding:10px 12px;margin:6px 0 8px;line-height:1.7;font-size:14px}
+.kpart{background:none;border:0;border-bottom:2px dotted var(--pri);color:var(--pri);font:inherit;font-weight:700;padding:0 1px;cursor:pointer}
+.kpart.sel{background:rgba(192,80,45,.15);border-bottom-color:#c0502d;color:#c0502d}

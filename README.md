@@ -115,6 +115,7 @@ python3 scripts/validate.py    # 문제 풀 검증
 - `python3 -I scripts/build_kanji.py <jamdict.db> scripts/kanji_src/grade-1.ko.json data/kanji/grade-1.json`
   생성 중 학년 한자 집합·한국 한자음·훈독·대표 단어(JMdict)를 공개 데이터와 대조해서 어긋나면 실패합니다. `jamdict.db` 는 PyPI 의 `jamdict-data` 패키지에 들어 있습니다(저장소에는 넣지 않음).
 - 출처: KANJIDIC2 / JMdict © EDRDG, CC BY-SA 4.0 (앱의 설정 → 출처·라이선스에 표기).
+- 획순: KanjiVG © Ulrich Apel, CC BY-SA 3.0 (`data/strokes/`, 만드는 법은 `scripts/build_strokes.py`). 구성 풀이는 암기용 연상 풀이이며 직접 작성(`data/kanji_notes.json`).
 
 ## 알려진 한계 / 다음에 할 만한 것
 

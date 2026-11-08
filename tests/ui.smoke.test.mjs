@@ -727,3 +727,33 @@ test('알림 발송: 시간대 판정과 구독 파싱, 구독이 없으면 조�
   assert.equal(m.parseSubscriptions('[{"endpoint":"https://x"},{"endpoint":"https://y","keys":{"p256dh":"a","auth":"b"}}]').length, 1, '키가 없는 구독은 버림');
   assert.ok(Object.values(m.MESSAGES).every(x => x.title && x.body));
 });
+
+test('한자 획순: 풀이 속 {요소} 는 그 획 범위와 연결되고, 재생 버튼이 동작한다', { skip: !JSDOM }, async () => {
+  await setup();
+  const { parseNote, strokePlayer, strokeFile } = await import('../js/strokes.js');
+  assert.equal(strokeFile('愛'), 'data/strokes/06101.json'.replace('06101', '611b'.padStart(5, '0')));
+  const data = JSON.parse(await fs.readFile(path.join(ROOT, strokeFile('愛')), 'utf8'));
+  assert.equal(data.strokes.length, 13);
+  const notes = JSON.parse(await fs.readFile(path.join(ROOT, 'data/kanji_notes.json'), 'utf8')).notes;
+  // 노트의 모든 {요소} 가 실제 획 범위로 풀려야 한다 (안 풀리면 그냥 글자로 남아 눌러도 반응이 없다)
+  for (const k of Object.keys(notes)) {
+    const d = JSON.parse(await fs.readFile(path.join(ROOT, strokeFile(k)), 'utf8'));
+    const segs = parseNote(notes[k], d.parts);
+    for (const s of segs.filter(x => typeof x !== 'string')) {
+      assert.ok(s.from >= 0 && s.to < d.strokes.length && s.from <= s.to, `${k}: ${s.label} 범위`);
+    }
+    assert.ok(segs.some(x => typeof x !== 'string'), `${k}: 눌러볼 구성 요소가 있어야 함`);
+    assert.ok(!notes[k].replace(/\{[^}]+\}/g, '').includes('{'), `${k}: 짝이 안 맞는 중괄호`);
+  }
+  const el = strokePlayer(data, notes['愛']);
+  document.body.append(el);
+  assert.match(el.querySelector('.kstroke-count').textContent, /13 \/ 13획/);
+  el.querySelector('.btn:last-of-type').click();            // 다음 획 → 전부 그려진 상태에서는 1획부터
+  assert.match(el.querySelector('.kstroke-count').textContent, /1 \/ 13획/);
+  assert.equal(el.querySelectorAll('path.cur').length, 1);
+  const part = [...el.querySelectorAll('.kpart')].find(b => b.textContent === '心');
+  part.click();
+  assert.equal(el.querySelectorAll('path.on').length, 4, '心 은 4획');
+  part.click();
+  assert.equal(el.querySelectorAll('path.on').length, 0, '다시 누르면 해제');
+});

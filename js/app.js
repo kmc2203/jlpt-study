@@ -105,6 +105,7 @@ function openCredits() {
     h('p', {}, '한자 카드의 음독·획수·부수와 대표 단어의 읽기 확인에는 다음 공개 사전 데이터를 사용했어요.'),
     h('ul', {},
       h('li', {}, 'KANJIDIC2 — 한자 정보'),
+      h('li', {}, 'KanjiVG — 한자 획순 (© Ulrich Apel, CC BY-SA 3.0)'),
       h('li', {}, 'JMdict — 일본어 사전')),
     h('p', {}, '이 데이터는 ', a('https://www.edrdg.org/', 'Electronic Dictionary Research and Development Group (EDRDG)'),
       ' 의 저작물이며, ', a('https://creativecommons.org/licenses/by-sa/4.0/', 'CC BY-SA 4.0'), ' 및 ',
