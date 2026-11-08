@@ -263,6 +263,8 @@ def load_file(rep, path):
 
 
 def main(argv):
+    skip_gram = "--skip-grammar" in argv       # 테스트용: 문법 항목 연결 검사를 건너뜀
+    argv = [a for a in argv if a != "--skip-grammar"]
     paths = [Path(a) for a in argv] or sorted(POOL_DIR.glob("*.json"))
     if not paths:
         print("검사할 파일이 없습니다.", file=sys.stderr)
@@ -278,7 +280,7 @@ def main(argv):
             target = p in paths
             sub = Report() if not target else rep
             check_item(sub, p.name, item)
-            if isinstance(item, dict):
+            if isinstance(item, dict) and not skip_gram:
                 check_grammar_coverage(sub, gentries, item, p.name)
             iid = item.get("id") if isinstance(item, dict) else None
             if iid:

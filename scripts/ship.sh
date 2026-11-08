@@ -1,7 +1,9 @@
 #!/bin/sh
 # 테스트 → 커밋 → 푸시. 사용: scripts/ship.sh "커밋 메시지"
 set -e
-npm test 2>&1 | grep -E "^# (pass|fail)|FAIL|Error|^OK" | tr '\n' ' '; echo
+OUT=$(npm test 2>&1) && OK=1 || OK=0
+echo "$OUT" | grep -E "^# (pass|fail)|FAIL|Error|^OK" | tr '\n' ' '; echo
+[ "$OK" = 1 ] || { echo "테스트 실패 — 푸시하지 않음"; exit 1; }
 git add -A
 git commit -q -m "$1
 
