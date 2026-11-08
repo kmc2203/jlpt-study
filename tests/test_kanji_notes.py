@@ -3,7 +3,7 @@
 import json, pathlib, re, unittest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-COMPLETE = False
+COMPLETE = True
 
 
 def files():
