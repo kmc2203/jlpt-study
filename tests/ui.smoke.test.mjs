@@ -22,7 +22,11 @@ async function setup() {
     confirm: () => true,
     fetch: async url => {
       try {
-        const txt = await fs.readFile(path.join(ROOT, String(url)), 'utf8');
+        let txt = await fs.readFile(path.join(ROOT, String(url)), 'utf8');
+        // 화면 글자 비교 테스트가 읽기(rt)에 흔들리지 않도록 후리가나 표기는 걷어낸다 (후리가나 자체는 별도 테스트)
+        if (/^data\/(pool|grammar)/.test(String(url))) {
+          txt = txt.replace(/\{([^{}|]+)\|[^{}]+\}/g, '$1').replace(/<ruby>(.*?)<rt>.*?<\/rt><\/ruby>/g, '$1');
+        }
         const body = JSON.parse(txt);
         // 실제 manifest 는 매일 공개가 늘어 풀이 소진될 수 있으니, 테스트에서는 일부만 공개된 상태로 고정한다
         if (String(url) === 'data/manifest.json') {
@@ -792,4 +796,22 @@ test('문법 정리: 풀의 문법 문제마다 정답 문법 항목이 이어�
   assert.equal(ko.hidden, true, '해석은 처음에 숨겨져 있다');
   [...document.querySelectorAll('.modal .gex button')][0].click();
   assert.equal(ko.hidden, false);
+});
+
+test('후리가나: 풀의 {漢字|よみ} 는 ruby 로 그려지고 글 읽기용 plain 에서는 빠지며, 설정이 꺼져 있으면 숨겨진다', { skip: !JSDOM }, async () => {
+  await setup();
+  const { fmt, plain } = await import('../js/util.js');
+  const { matchGrammar } = await import('../js/grammar.js');
+  assert.equal(fmt('{促|うなが}す'), '<ruby>促<rt>うなが</rt></ruby>す');
+  assert.equal(plain('[[{態度|たいど}]]を見せる'), '態度を見せる');
+  const css = await fs.readFile(path.join(ROOT, 'css/style.css'), 'utf8');
+  assert.match(css, /body:not\(\.furigana\) rt\{display:none\}/, '설정이 꺼져 있으면 rt 가 숨겨져야 함');
+  const app = await fs.readFile(path.join(ROOT, 'js/app.js'), 'utf8');
+  assert.match(app, /classList\.toggle\('furigana'/, '설정과 body.furigana 가 이어져야 함');
+  // 후리가나가 달린 문제도 문법 항목과 그대로 이어진다 (마크업을 걷어내고 비교)
+  const { loadGrammar } = await import('../js/grammar.js');
+  const entries = await loadGrammar();
+  const item = { type: 'grammar' };
+  const q = { choices: ['{促|うなが}す', 'あ', 'い', 'う'], answer: 0, full: '' };
+  assert.ok(matchGrammar(entries, item, q), 'matchGrammar 가 마크업 선택지에서도 동작');
 });

@@ -147,7 +147,7 @@ async function renderSettings(view) {
   view.replaceChildren(
     h('div', { class: 'card' },
       h('h3', {}, '표시'),
-      h('label', { class: 'row' }, fur, '문제·해설에 후리가나 표시 (후리가나가 달린 문제만)'),
+      h('label', { class: 'row' }, fur, '후리가나 표시 (시험처럼 N2 범위를 넘는 한자에만 달려요)'),
       h('label', { class: 'row', style: 'margin-top:8px' }, arr, '★ 문장 완성을 조각 배열로 풀기 (끄면 선택지 방식)'),
       h('div', { class: 'row', style: 'margin-top:8px' }, '모의고사 목표 정답률', target, '%')),
     pushCard,

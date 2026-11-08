@@ -42,7 +42,7 @@ def run(items, grammar=False):
     with tempfile.TemporaryDirectory() as d:
         p = Path(d) / "batch-test.json"
         p.write_text(json.dumps({"items": items}, ensure_ascii=False), encoding="utf-8")
-        r = subprocess.run([sys.executable, "-I", str(VALIDATE), str(p)] + ([] if grammar else ["--skip-grammar"]), capture_output=True, text=True)
+        r = subprocess.run([sys.executable, "-I", str(VALIDATE), str(p)] + ([] if grammar else ["--skip-grammar"]) + ["--skip-furigana"], capture_output=True, text=True)
         return r.returncode, r.stdout + r.stderr
 
 

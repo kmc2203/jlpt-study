@@ -63,6 +63,8 @@ label.f{display:block;margin:8px 0 2px;font-size:13px;color:var(--sub)}
 u{text-decoration-thickness:2px;text-underline-offset:4px}
 body:not(.furigana) rt{display:none}
 rt{font-size:.55em}
+body.furigana .jp,body.furigana .stem,body.furigana .passage{line-height:1.9}
+ruby{ruby-align:center}
 /* 선택지는 글자를 길게 눌러 선택할 수 있도록 div 로 만들고 선택을 허용한다 */
 .choice{display:flex;gap:10px;width:100%;text-align:left;margin:0 0 8px;padding:11px 12px;border:1.5px solid var(--line);
   border-radius:12px;background:var(--card);cursor:pointer;align-items:baseline;

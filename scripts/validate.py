@@ -262,9 +262,18 @@ def load_file(rep, path):
     return items
 
 
+def check_furigana(rep, item, fname):
+    """N2 범위 밖 한자에 후리가나가 빠졌는지 (분석기 없이 검사). 고치려면: python scripts/furigana.py"""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import furigana
+    for label, miss in furigana.missing_in_item(item):
+        rep.err(f"{fname}[{item.get('id')}]", f"후리가나 없음 {label} 「{miss}」 — python scripts/furigana.py 실행")
+
+
 def main(argv):
     skip_gram = "--skip-grammar" in argv       # 테스트용: 문법 항목 연결 검사를 건너뜀
-    argv = [a for a in argv if a != "--skip-grammar"]
+    skip_fur = "--skip-furigana" in argv      # 테스트용: 후리가나 누락 검사를 건너뜀
+    argv = [a for a in argv if a not in ("--skip-grammar", "--skip-furigana")]
     paths = [Path(a) for a in argv] or sorted(POOL_DIR.glob("*.json"))
     if not paths:
         print("검사할 파일이 없습니다.", file=sys.stderr)
@@ -282,6 +291,8 @@ def main(argv):
             check_item(sub, p.name, item)
             if isinstance(item, dict) and not skip_gram:
                 check_grammar_coverage(sub, gentries, item, p.name)
+            if isinstance(item, dict) and not skip_fur:
+                check_furigana(sub, item, p.name)
             iid = item.get("id") if isinstance(item, dict) else None
             if iid:
                 if iid in seen_ids:

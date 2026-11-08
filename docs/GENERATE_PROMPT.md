@@ -63,7 +63,7 @@ question = {
 }
 
 [표기 규칙]
-- 밑줄: [[賛成]]    후리가나: {漢字|かんじ}    줄바꿈: \n
+- 밑줄: [[賛成]]    후리가나: 직접 쓰지 않음(아래 참고)    줄바꿈: \n
 - 빈칸: 반드시 전각 괄호와 전각 공백 「（　）」 (글의 문법은 「（ 1 ）」)
 - sentence_order: stem 에 「＿＿＿」 3개와 「★」 1개가 있어야 한다. 배열이 한 가지로만 가능하도록 문장을 설계한다.
   answer 는 ★ 자리에 들어가는 선택지의 인덱스, order[★ 위치] == answer 여야 한다.
@@ -110,3 +110,20 @@ question = {
 - 기본 분배: kanji_reading 1, orthography 1, context 1, synonym 1, usage 1, grammar 3, sentence_order 1, 나머지 1개는 요일마다 text_grammar / reading_short / info_search 중 순환.
 - `docs/study_focus.json` 의 `weak_types` 에 든 유형은 위 분배에서 grammar 등을 줄이고 그 유형을 늘려 채운다(최대 4개).
 - 기존 batch 파일과 기존 문제는 수정하지 않는다. 검증이 3번 고쳐도 통과하지 않으면 푸시하지 않는다.
+
+
+---
+
+## 후리가나 (자동)
+
+시험처럼 **N2 범위(`scripts/n2_kanji.txt`)를 넘는 한자**에만 후리가나를 답니다. 문제를 만든 뒤 아래를 실행하면 `{漢字|かんじ}` 표기가 자동으로 들어가요.
+
+```
+pip install fugashi unidic-lite            # 처음 한 번
+python scripts/furigana.py --grammar --report   # 달고, (단어, 읽기) 목록을 보여 줌 → 문맥에 맞는지 훑어보기
+python scripts/furigana.py --check --grammar    # 빠진 곳이 없는지 확인
+```
+
+- 읽기 문제(kanji_reading)의 밑줄 말과 표기 문제(orthography)의 선택지에는 달지 않습니다(정답이 드러나므로).
+- 읽기가 틀리면 그 부분만 손으로 `{漢字|올바른읽기}` 로 고치세요. 손으로 단 것은 보존됩니다.
+- `validate.py` 가 후리가나 누락을 오류로 알려 줍니다. 앱 설정의 「후리가나 표시」로 켜고 끕니다.

@@ -2,7 +2,7 @@
 //   data/grammar.json 의 항목 { id, form, keys[], level, mean, connect, note, similar[{f,d}], ex[{ja,ko}] }
 //   항목은 새 문제가 만들어질 때마다 함께 늘어난다 (docs/GENERATE_PROMPT.md).
 //   문제와 항목은 keys 와 문제 글자를 비교해 자동으로 이어진다 (scripts/validate.py 도 같은 규칙).
-import { h, plain, openModal } from './util.js';
+import { h, plain, fmt, openModal } from './util.js';
 import { linkKanji } from './kanji.js';
 
 let cache;
@@ -57,7 +57,7 @@ export function grammarSection(entries, item, q) {
 export function openGrammar(e) {
   const ex = e.ex.map(x => {
     const ko = h('div', { class: 'sub', hidden: true }, x.ko);
-    const ja = h('div', { class: 'jp' }, x.ja);
+    const ja = h('div', { class: 'jp', html: fmt(x.ja) });
     linkKanji(ja);
     return h('li', {}, ja, ko,
       h('button', { class: 'btn small', type: 'button', style: 'margin-top:4px', onclick: ev => {
