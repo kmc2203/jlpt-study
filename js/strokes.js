@@ -117,7 +117,7 @@ export function strokePlayer(data, note) {
       '밑줄 친 부분을 누르면 그 부분의 획이 강조돼요. 모양을 외우기 위한 연상 풀이예요.'));
   }
 
-  paint();
+  play();   // 카드를 열면 바로 획순이 재생된다
   return h('div', { class: 'kstroke' },
     h('div', { class: 'kstroke-box' }, svg),
     h('div', { class: 'row', style: 'justify-content:center;gap:8px;align-items:center;margin:8px 0' },

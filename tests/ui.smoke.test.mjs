@@ -750,8 +750,8 @@ test('한자 획순: 풀이 속 {요소} 는 그 획 범위와 연결되고, 재
   }
   const el = strokePlayer(data, notes['愛']);
   document.body.append(el);
-  assert.match(el.querySelector('.kstroke-count').textContent, /13 \/ 13획/);
-  el.querySelector('.btn:last-of-type').click();            // 다음 획 → 전부 그려진 상태에서는 1획부터
+  assert.match(el.querySelector('.kstroke-count').textContent, /^0 \/ 13획/, '열자마자 처음부터 재생이 시작된다');
+  el.querySelector('.btn:last-of-type').click();            // 다음 획 (재생 중단 후 1획부터)
   assert.match(el.querySelector('.kstroke-count').textContent, /1 \/ 13획/);
   assert.equal(el.querySelectorAll('path.cur').length, 1);
   const part = [...el.querySelectorAll('.kpart')].find(b => b.textContent === '心');
