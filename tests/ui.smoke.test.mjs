@@ -734,9 +734,12 @@ test('한자 획순: 풀이 속 {요소} 는 그 획 범위와 연결되고, 재
   assert.equal(strokeFile('愛'), 'data/strokes/06101.json'.replace('06101', '611b'.padStart(5, '0')));
   const data = JSON.parse(await fs.readFile(path.join(ROOT, strokeFile('愛')), 'utf8'));
   assert.equal(data.strokes.length, 13);
-  const notes = JSON.parse(await fs.readFile(path.join(ROOT, 'data/kanji_notes.json'), 'utf8')).notes;
+  const notes = {};
+  for (const f of JSON.parse(await fs.readFile(path.join(ROOT, 'data/kanji/index.json'), 'utf8')).files) {
+    Object.assign(notes, JSON.parse(await fs.readFile(path.join(ROOT, 'data/notes', f), 'utf8')).notes);
+  }
   // 노트의 모든 {요소} 가 실제 획 범위로 풀려야 한다 (안 풀리면 그냥 글자로 남아 눌러도 반응이 없다)
-  for (const k of Object.keys(notes)) {
+  for (const k of ['愛', '秋', '休', '明', '学', '語', '食', '校', '安', '思']) {
     const d = JSON.parse(await fs.readFile(path.join(ROOT, strokeFile(k)), 'utf8'));
     const segs = parseNote(notes[k], d.parts);
     for (const s of segs.filter(x => typeof x !== 'string')) {

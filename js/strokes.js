@@ -1,6 +1,6 @@
 // 한자 획순 재생 + 구성 풀이.
 //   data/strokes/<5자리 16진수>.json : KanjiVG(CC BY-SA 3.0, (c) Ulrich Apel)에서 뽑은 획 경로와 구성 요소의 획 범위
-//   data/kanji_notes.json            : 한자별 암기용 구성 풀이 (직접 작성). 풀이 속 {글자} 는 눌러서 그 부분 획을 강조
+//   data/notes/*.json                : 한자별 암기용 구성 풀이 (직접 작성). 풀이 속 {글자} 는 눌러서 그 부분 획을 강조
 import { h } from './util.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -24,9 +24,15 @@ export async function loadStrokes(k) {
   return d;
 }
 
+// 풀이는 data/notes/<학년 파일>.json (data/kanji/index.json 과 같은 파일 이름). 한 번만 모아서 불러온다.
 export async function loadNote(k) {
   if (notes === undefined) {
-    try { notes = (await getJson('data/kanji_notes.json')).notes || {}; } catch { notes = {}; }
+    notes = {};
+    try {
+      const index = await getJson('data/kanji/index.json');
+      const parts = await Promise.all(index.files.map(f => getJson('data/notes/' + f).catch(() => null)));
+      for (const p of parts) Object.assign(notes, p?.notes);
+    } catch { /* 풀이 없이도 획순은 보인다 */ }
   }
   return notes[k] || null;
 }
