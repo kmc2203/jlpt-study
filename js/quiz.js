@@ -9,6 +9,7 @@ import { addWord, findWord } from './words.js';
 import { openWordModal } from './vocab.js';
 import { recentlySelected } from './select.js';
 import { linkKanji } from './kanji.js';
+import { loadGrammar, grammarSection } from './grammar.js';
 import { REPO } from './config.js';
 
 let pendingDrill = null; // 통계 화면의 '이 유형 집중 풀기' 요청
@@ -318,6 +319,9 @@ function buildExplanation(item, qi, q, ok) {
   card.append(toggle, ko);
 
   if (e.point) card.append(h('h3', {}, '포인트'), h('div', { class: 'jp-note', html: fmt(e.point) }));
+  const gslot = h('div', {});
+  card.append(gslot);
+  loadGrammar().then(entries => { const sec = grammarSection(entries, item, q); if (sec) gslot.append(sec); });
   if (Array.isArray(e.choices) && e.choices.length) {
     card.append(h('h3', {}, '선택지 해설'),
       h('ol', { class: 'plain-list' },

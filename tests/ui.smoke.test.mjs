@@ -760,3 +760,36 @@ test('한자 획순: 풀이 속 {요소} 는 그 획 범위와 연결되고, 재
   part.click();
   assert.equal(el.querySelectorAll('path.on').length, 0, '다시 누르면 해제');
 });
+
+test('문법 정리: 풀의 문법 문제마다 정답 문법 항목이 이어지고, 눌러서 상세를 볼 수 있다', { skip: !JSDOM }, async () => {
+  await setup();
+  const { loadGrammar, matchGrammar, grammarSection, openGrammar } = await import('../js/grammar.js');
+  const entries = await loadGrammar();
+  assert.ok(entries.length >= 50);
+  const man = JSON.parse(await fs.readFile(path.join(ROOT, 'data/manifest.json'), 'utf8'));
+  let checked = 0;
+  for (const f of man.batches) {
+    for (const item of JSON.parse(await fs.readFile(path.join(ROOT, 'data', f), 'utf8')).items) {
+      if (!['grammar', 'text_grammar', 'sentence_order'].includes(item.type)) continue;
+      for (const [i, q] of item.questions.entries()) {
+        assert.ok(matchGrammar(entries, item, q).main.length, `${item.id}.q${i + 1}: 정답 문법 항목 없음`);
+        checked++;
+      }
+    }
+  }
+  assert.ok(checked >= 30);
+  // にもかかわらず 문제: 정답 항목은 main, 헷갈린 선택지(おかげで·せいで)는 compare
+  const gr = JSON.parse(await fs.readFile(path.join(ROOT, 'data/pool/batch-002.json'), 'utf8')).items.find(x => x.id === 'gr-001');
+  const m = matchGrammar(entries, gr, gr.questions[0]);
+  assert.deepEqual(m.main.map(e => e.id), ['nimokakawarazu']);
+  assert.deepEqual(m.compare.map(e => e.id).sort(), ['okagede', 'seide']);
+  const sec = grammarSection(entries, gr, gr.questions[0]);
+  document.body.append(sec);
+  sec.querySelector('.gchip.main').click();
+  assert.match(document.querySelector('.modal').textContent, /에도 불구하고/);
+  assert.match(document.querySelector('.modal').textContent, /接続|접속/);
+  const ko = document.querySelector('.modal .gex li div.sub');
+  assert.equal(ko.hidden, true, '해석은 처음에 숨겨져 있다');
+  [...document.querySelectorAll('.modal .gex button')][0].click();
+  assert.equal(ko.hidden, false);
+});

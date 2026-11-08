@@ -184,6 +184,71 @@ def item_keys(item):
     return keys
 
 
+GRAMMAR_FILE = ROOT / "data" / "grammar.json"
+GRAMMAR_TYPES = {"grammar", "text_grammar", "sentence_order"}
+
+
+def gnorm(s):
+    """js/grammar.js 의 norm() 과 같은 규칙."""
+    return re.sub(r"[～〜~「」『』\s　、。,.]", "", plain(s or ""))
+
+
+def load_grammar(rep):
+    """data/grammar.json 검사. 반환: 항목 목록."""
+    try:
+        entries = json.loads(GRAMMAR_FILE.read_text(encoding="utf-8")).get("entries", [])
+    except Exception as ex:  # noqa: BLE001
+        rep.err("grammar.json", f"읽기 실패: {ex}")
+        return []
+    ids = set()
+    for e in entries:
+        w = f"grammar.json[{e.get('id')}]"
+        if not isinstance(e, dict) or not re.match(r"^[a-z0-9]+$", str(e.get("id", ""))):
+            rep.err(w, "id 는 영문소문자·숫자")
+            continue
+        if e["id"] in ids:
+            rep.err(w, "id 중복")
+        ids.add(e["id"])
+        for f in ("form", "mean", "connect", "note"):
+            if not isinstance(e.get(f), str) or not e[f].strip():
+                rep.err(w, f"{f} 필요")
+        if not e.get("keys") or not all(isinstance(k, str) and gnorm(k) for k in e["keys"]):
+            rep.err(w, "keys(문제 선택지·문장과 비교할 표기) 필요")
+        if e.get("level") not in LEVELS:
+            rep.err(w, "level 은 N5~N2")
+        if not (isinstance(e.get("ex"), list) and len(e["ex"]) >= 1 and all(isinstance(x, dict) and x.get("ja") and x.get("ko") for x in e["ex"])):
+            rep.err(w, "ex(예문 ja·ko) 1개 이상 필요")
+        for sm in e.get("similar", []):
+            if not (isinstance(sm, dict) and sm.get("f") and sm.get("d")):
+                rep.err(w, "similar 는 {f, d}")
+    return entries
+
+
+def grammar_hit(entries, item, q):
+    """js/grammar.js 의 matchGrammar() 와 같은 규칙. 정답/완성문/배열 조각에 이어지는 항목 목록."""
+    choices = [gnorm(c) for c in q.get("choices", [])]
+    ans = q.get("answer")
+    correct = None if item.get("type") == "sentence_order" else (choices[ans] if isinstance(ans, int) and 0 <= ans < len(choices) else None)
+    full = gnorm(q.get("full", ""))
+    hits = []
+    for e in entries:
+        keys = [k for k in (gnorm(k) for k in e.get("keys", [])) if k]
+        if any((correct is not None and k == correct) or (len(k) >= 4 and k in full)
+               or ("…" in k and re.search(".*?".join(re.escape(x) for x in k.split("…")), full))
+               or (item.get("type") == "sentence_order" and k in choices) for k in keys):
+            hits.append(e)
+    return hits
+
+
+def check_grammar_coverage(rep, entries, item, where):
+    if item.get("type") not in GRAMMAR_TYPES:
+        return
+    for qi, q in enumerate(item.get("questions", [])):
+        if isinstance(q, dict) and not grammar_hit(entries, item, q):
+            rep.err(f"{where}[{item.get('id')}].q{qi + 1}",
+                    "이 문제의 문법이 data/grammar.json 에 없음 (정답 표현의 항목을 추가하고 keys 에 정답 선택지·배열 조각 표기를 넣을 것)")
+
+
 def load_file(rep, path):
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -207,11 +272,14 @@ def main(argv):
     rep = Report()
     seen_ids, seen_keys = {}, {}
     type_count = Counter()
+    gentries = load_grammar(rep)
     for p in all_paths:
         for item in load_file(rep, p):
             target = p in paths
             sub = Report() if not target else rep
             check_item(sub, p.name, item)
+            if isinstance(item, dict):
+                check_grammar_coverage(sub, gentries, item, p.name)
             iid = item.get("id") if isinstance(item, dict) else None
             if iid:
                 if iid in seen_ids:

@@ -205,3 +205,11 @@ details summary{cursor:pointer;color:var(--pri);font-size:14px;padding:6px 0}
 .kstory{text-align:left;background:var(--pri-weak);border-left:3px solid var(--pri);border-radius:8px;padding:10px 12px;margin:6px 0 8px;line-height:1.7;font-size:14px}
 .kpart{background:none;border:0;border-bottom:2px dotted var(--pri);color:var(--pri);font:inherit;font-weight:700;padding:0 1px;cursor:pointer}
 .kpart.sel{background:rgba(192,80,45,.15);border-bottom-color:#c0502d;color:#c0502d}
+
+/* 문법 정리 */
+.gchips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.gchip{min-height:36px;padding:0 12px;border:1px solid var(--line);border-radius:18px;background:var(--card);color:inherit;font:inherit;cursor:pointer}
+.gchip.main{border-color:var(--pri);color:var(--pri);font-weight:700}
+.gram h4{margin:12px 0 4px;font-size:.9rem;color:var(--sub)}
+.gram .gmean{font-size:1.05rem}
+.gram .gex li{margin-bottom:10px}
