@@ -9,11 +9,13 @@ import { addWord, findWord } from './words.js';
 import { openWordModal } from './vocab.js';
 import { recentlySelected } from './select.js';
 import { linkKanji } from './kanji.js';
-import { loadGrammar, grammarSection } from './grammar.js';
+import { loadGrammar, grammarSection, grammarStats, buildGrammarReview, openGrammar } from './grammar.js';
 import { REPO } from './config.js';
 
 let pendingDrill = null; // 통계 화면의 '이 유형 집중 풀기' 요청
 export const requestDrill = type => { pendingDrill = type; };
+let pendingSession = null; // 다른 화면(문법 모아보기)에서 넘어온 '이 문제들로 시작' 요청
+export const requestSession = (items, mode) => { pendingSession = { items, mode }; };
 
 // { items, queue:[{item, qi}], pos, mode, results:{id:[bool]}, answered, arrange, exam:{deadline,startedAt,limitMin}|null }
 let session = null;
@@ -21,7 +23,7 @@ let examTimer = null;
 const stopTimer = () => { clearInterval(examTimer); examTimer = null; };
 
 const CIRCLED = ['①', '②', '③', '④', '⑤', '⑥'];
-const MODE_LABEL = { daily: '오늘의 문제', extra: '더 풀기', review: '틀린 문제 복습', drill: '집중 풀기', srs: '간격 복습', exam: '모의고사' };
+const MODE_LABEL = { daily: '오늘의 문제', extra: '더 풀기', review: '틀린 문제 복습', gram: '문법 복습', gdrill: '문법 연습', drill: '집중 풀기', srs: '간격 복습', exam: '모의고사' };
 const SQUASH = s => String(s ?? '').replace(/\[\[(.+?)\]\]/g, '$1').replace(/\{([^{}|]+)\|([^{}]+)\}/g, '$1').replace(/[\s　、。，,．.・「」『』]/g, '');
 
 /* ───────── 시작 화면 ───────── */
@@ -38,6 +40,10 @@ export async function renderQuizHome(view) {
   const wrong = wrongAvailable(d, progress);
   const due = srsDue(d, progress, today);
 
+  if (pendingSession) {
+    const { items, mode } = pendingSession; pendingSession = null;
+    return start(items, mode);
+  }
   if (pendingDrill) {
     const type = pendingDrill; pendingDrill = null;
     // 틀렸던 문제 → 공개됐지만 안 푼 문제 → 아직 공개 전인 새 문제 순으로 최대 10문제
@@ -65,6 +71,20 @@ export async function renderQuizHome(view) {
   const qCount = d.items.reduce((a, i) => a + i.questions.length, 0);
   const examSel = h('select', {}, ...[10, 20, 30].filter(n => n <= Math.max(10, qCount)).map(n => h('option', { value: n }, `${n}문항 · ${n}분`)));
 
+  // 틀린 문법 자동 복습: 틀린 문제가 가리키는 '문법'을 모아서, 같은 문법의 다른 문제로 다시 확인
+  const gEntries = await loadGrammar();
+  const gstats = grammarStats(d, gEntries, progress, today);
+  const gr = buildGrammarReview(gstats, 10);
+  const gramCard = h('div', { class: 'card' },
+    h('h2', {}, '틀린 문법 복습'),
+    h('div', { class: 'sub' }, gr.weakCount
+      ? `틀린 문법 ${gr.weakCount}개 — 같은 문법의 새 문제 ${gr.fresh}개 + 틀렸던 문제 ${gr.redo}개로 ${gr.items.length}문제를 골랐어요. 맞히면 그 문법은 「익힘」이 돼요.`
+      : '틀린 문법이 아직 없어요. 문법 문제를 풀다가 틀리면 여기에 모여요.'),
+    gr.weakCount ? h('div', { class: 'gchips' }, ...gr.weak.slice(0, 6).map(s => h('button', { class: 'gchip', type: 'button', onclick: () => openGrammar(s.entry) }, s.entry.form))) : '',
+    h('div', { class: 'row end' },
+      h('a', { class: 'btn', href: '#/grammar', style: 'text-decoration:none' }, '문법 모아보기'),
+      h('button', { class: 'btn primary', disabled: !gr.items.length, onclick: () => start(gr.items, 'gram') }, '복습 시작')));
+
   view.replaceChildren(
     h('div', { class: 'card' },
       h('h2', {}, '오늘의 문제'),
@@ -76,6 +96,7 @@ export async function renderQuizHome(view) {
         ? `복습할 문제 ${due.length}개 — 틀린 문제는 ${SRS_STEPS.join('·')}일 뒤에 다시 나와요`
         : '오늘 도착한 복습이 없어요. 문제를 틀리면 잊을 때쯤 다시 나와요.'),
       h('div', { class: 'row end' }, h('button', { class: 'btn primary', disabled: !due.length, onclick: () => start(due, 'srs') }, '복습 시작'))),
+    gramCard,
     h('div', { class: 'card' },
       h('h2', {}, '모의고사'),
       h('div', { class: 'sub' }, '어휘·문법·독해를 시험 비율로 섞고 시간을 재요. 풀 때는 해설이 안 나오고, 끝나면 유형별 결과와 목표 점수 비교를 보여 줘요.'),

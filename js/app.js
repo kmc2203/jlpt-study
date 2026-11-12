@@ -8,12 +8,14 @@ import { renderVocab } from './vocab.js';
 import { initSelectionBar, refreshSelectionBar } from './select.js';
 import { renderKanjiList } from './kanjilist.js';
 import { renderStats } from './stats.js';
+import { renderGrammarList } from './grammarlist.js';
+import { loadGrammar, grammarStats } from './grammar.js';
 import { loadKanjiDb } from './kanjidb.js';
 import { openModal } from './util.js';
 import { pushSupported, currentSubscription, enablePush, disablePush } from './push.js';
 import { REPO } from './config.js';
 
-const TITLES = { home: 'JLPT N2 공부방', quiz: '문제 풀이', vocab: '단어 오답노트', settings: '설정', kanji: '한자 카드', stats: '통계' };
+const TITLES = { home: 'JLPT N2 공부방', quiz: '문제 풀이', vocab: '단어 오답노트', settings: '설정', kanji: '한자 카드', stats: '통계', grammar: '문법 모아보기' };
 
 async function applySettings() {
   const s = await load('settings');
@@ -33,12 +35,13 @@ async function renderHome(view) {
   const progress = await load('progress');
   const words = await allWords();
   const today = todayStr();
-  let dailyN = '-', dueN = '-', wrongN = Object.keys(progress.wrong).length;
+  let dailyN = '-', dueN = '-', wrongN = Object.keys(progress.wrong).length, gramN = 0;
   try {
     const d = await loadData();
     dailyN = dailyAvailable(d, progress, today).length;
     wrongN = wrongAvailable(d, progress).length;
     dueN = srsDue(d, progress, today).length;
+    gramN = grammarStats(d, await loadGrammar(), progress, today).filter(x => x.status === 'weak').length;
   } catch { /* 오프라인 첫 실행 등 */ }
 
   const stat = (label, value) => h('div', { class: 'card grow', style: 'text-align:center;margin:0' },
@@ -52,8 +55,9 @@ async function renderHome(view) {
       stat('단어 오답노트', words.length)),
     h('div', { class: 'card' },
       h('h2', {}, '오늘 할 일'),
-      h('div', { class: 'sub' }, `풀 문제 ${dailyN}개 · 오늘의 복습 ${dueN}개 · 틀린 문제 전체 ${wrongN}개`),
+      h('div', { class: 'sub' }, `풀 문제 ${dailyN}개 · 오늘의 복습 ${dueN}개 · 틀린 문제 전체 ${wrongN}개 · 틀린 문법 ${gramN}개`),
       h('div', { class: 'row end' },
+        h('a', { class: 'btn', href: '#/grammar', style: 'text-decoration:none' }, '문법'),
         h('a', { class: 'btn', href: '#/kanji', style: 'text-decoration:none' }, '한자 카드'),
         h('a', { class: 'btn', href: '#/vocab', style: 'text-decoration:none' }, '단어 학습'),
         h('a', { class: 'btn primary', href: '#/quiz', style: 'text-decoration:none' }, '문제 풀기'))),
@@ -178,7 +182,7 @@ async function renderSettings(view) {
 /* ───────── 라우터 ───────── */
 async function route() {
   const name = location.hash.replace(/^#\/?/, '').split('/')[0] || 'home';
-  document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === name));
+  document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === (name === 'grammar' ? 'quiz' : name)));
   $('#title').textContent = TITLES[name] || TITLES.home;
   document.body.dataset.route = name; // 글자 선택 바는 문제 화면에서만 동작
   refreshSelectionBar();
@@ -189,6 +193,7 @@ async function route() {
     else if (name === 'settings') await renderSettings(view);
     else if (name === 'kanji') await renderKanjiList(view);
     else if (name === 'stats') await renderStats(view);
+    else if (name === 'grammar') await renderGrammarList(view);
     else await renderHome(view);
   } catch (e) {
     console.error(e);

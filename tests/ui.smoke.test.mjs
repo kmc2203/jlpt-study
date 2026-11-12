@@ -110,7 +110,7 @@ test('문제 풀이: 오늘의 문제 → 풀이 → 해설 → 결과, 푼 문�
   await renderQuizHome(view);
   assert.match(bodyText(), /오늘 분량은 모두 풀었어요/);
   const reviewBtns = [...document.querySelectorAll('button')].filter(b => b.textContent.trim() === '복습 시작');
-  assert.equal(reviewBtns.length, 2, '오늘의 복습 + 틀린 문제 복습');
+  assert.equal(reviewBtns.length, 3, '오늘의 복습 + 틀린 문법 복습 + 틀린 문제 복습');
   assert.ok(reviewBtns[0].disabled, '방금 틀린 문제의 간격 복습은 내일부터');
   assert.ok(!reviewBtns[1].disabled, '틀린 문제 복습 가능');
   const p2 = await load('progress');
@@ -814,4 +814,57 @@ test('후리가나: 풀의 {漢字|よみ} 는 ruby 로 그려지고 글 읽기�
   const item = { type: 'grammar' };
   const q = { choices: ['{促|うなが}す', 'あ', 'い', 'う'], answer: 0, full: '' };
   assert.ok(matchGrammar(entries, item, q), 'matchGrammar 가 마크업 선택지에서도 동작');
+});
+
+test('틀린 문법 복습·문법 모아보기: 푼 기록에서 문법 상태가 정해지고, 새 문제부터 골라 복습하며, 맞히면 익힘이 된다', { skip: !JSDOM }, async () => {
+  const { view } = await setup();
+  const { loadData } = await import('../js/data.js');
+  const { load, commit } = await import('../js/storage.js');
+  const { loadGrammar, grammarStats, buildGrammarReview, grammarIndex } = await import('../js/grammar.js');
+  const { renderQuizHome } = await import('../js/quiz.js');
+  const { renderGrammarList } = await import('../js/grammarlist.js');
+  const d = await loadData(), entries = await loadGrammar();
+  const today = '2099-01-01';
+  const idx = grammarIndex(d, entries);
+  // 문제가 2개 이상 걸린 문법 하나를 골라, 첫 문제를 '틀림'으로 기록한다
+  const target = entries.find(e => new Set(idx.get(e.id).map(x => x.item.id)).size >= 2);
+  assert.ok(target, '문제가 2개 이상 이어진 문법이 있어야 함');
+  const hits = idx.get(target.id), first = hits[0].item;
+  const progress = await load('progress');
+  assert.equal(grammarStats(d, entries, progress, today).every(s => s.status === 'new'), true, '기록이 없으면 전부 아직 안 만남');
+  progress.done[first.id] = { at: 1, res: first.questions.map((_, k) => (k === hits[0].qi ? false : true)) };
+  progress.wrong[first.id] = true;
+  await commit('progress');
+
+  let st = grammarStats(d, entries, progress, today).find(s => s.entry.id === target.id);
+  assert.equal(st.status, 'weak'); assert.ok(st.wrong >= 1);
+  const rv = buildGrammarReview(grammarStats(d, entries, progress, today), 10);
+  assert.ok(rv.items.length >= 2 && rv.weakCount >= 1);
+  assert.notEqual(rv.items[0].id, first.id, '같은 문법의 새 문제를 틀렸던 문제보다 먼저 낸다');
+  assert.ok(rv.items.some(i => i.id === first.id), '새 문제 뒤에는 틀렸던 문제도 포함');
+
+  // 퀴즈 홈에 카드가 보이고, 시작하면 문법 복습 세션이 열린다
+  await renderQuizHome(view);
+  assert.match(bodyText(), /틀린 문법 복습/);
+  const card = [...document.querySelectorAll('.card')].find(c => c.querySelector('h2')?.textContent === '틀린 문법 복습');
+  assert.match(card.textContent, /틀린 문법 \d+개/);
+  [...card.querySelectorAll('button')].find(b => b.textContent === '복습 시작').click();
+  await waitFor(() => document.querySelector('.choice, .piece, .stem'), '문제 화면');
+  assert.equal(document.querySelectorAll('.choice').length > 0 || document.querySelectorAll('.piece').length > 0, true);
+
+  // 문법 모아보기: 상태 필터와 상세, '이 문법 문제 풀기'
+  await renderGrammarList(view);
+  assert.match(bodyText(), new RegExp('틀림 \\d+'));
+  const weakBtn = [...document.querySelectorAll('.gchip')].find(b => b.textContent.startsWith('틀림'));
+  weakBtn.click();
+  const rows = [...document.querySelectorAll('.grow-row')];
+  assert.ok(rows.length >= 1 && rows.every(r => /틀림/.test(r.textContent)), '틀림 필터에는 틀린 문법만');
+  rows.find(r => r.textContent.includes(target.form)).click();
+  const go = await waitFor(() => [...document.querySelectorAll('.modal button')].find(b => b.textContent.startsWith('이 문법 문제 풀기')), '이 문법 문제 풀기 버튼');
+  assert.ok(go);
+
+  // 틀렸던 문제를 맞히면 익힘으로 바뀐다 (기록에서 계산)
+  progress.done[first.id] = { at: 2, res: first.questions.map(() => true) };
+  st = grammarStats(d, entries, progress, today).find(s => s.entry.id === target.id);
+  assert.notEqual(st.status, 'weak');
 });

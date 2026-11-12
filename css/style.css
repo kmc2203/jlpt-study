@@ -215,3 +215,10 @@ details summary{cursor:pointer;color:var(--pri);font-size:14px;padding:6px 0}
 .gram h4{margin:12px 0 4px;font-size:.9rem;color:var(--sub)}
 .gram .gmean{font-size:1.05rem}
 .gram .gex li{margin-bottom:10px}
+
+/* 문법 모아보기 */
+.glist{display:flex;flex-direction:column}
+.grow-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 2px;border:0;border-bottom:1px solid var(--line);background:none;color:inherit;font:inherit;cursor:pointer}
+.grow-row:last-child{border-bottom:0}
+.grow-row .gform{font-weight:700}
+.grow-row .gst{text-align:right;flex:none}
