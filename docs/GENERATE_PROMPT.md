@@ -109,6 +109,10 @@ question = {
 - 평일 11시(KST) 전에 실행 → 새 아이템 10개를 새 batch 파일로 추가 → `validate.py` 통과 → `release.py --batch` 로 당일 공개 → 푸시(Actions 가 배포).
 - 기본 분배: kanji_reading 1, orthography 1, context 1, synonym 1, usage 1, grammar 3, sentence_order 1, 나머지 1개는 요일마다 text_grammar / reading_short / info_search 중 순환.
 - `docs/study_focus.json` 의 `weak_types` 에 든 유형은 위 분배에서 grammar 등을 줄이고 그 유형을 늘려 채운다(최대 4개).
+- **우선 어휘**: `docs/exam_words.json`(최빈출·출제 예상·빈출 약 400개)의 단어를 적극 사용한다. `python scripts/exam_words.py --pick` 이 오늘 쓸 단어를 추천해 준다(최빈출:출제예상:빈출 ≈ 2:2:1, 안 나온 단어부터).
+  - kanji_reading·orthography 의 정답 단어와 context·synonym·usage 의 핵심 단어는 추천 목록에서 고른다. grammar·sentence_order·독해 문장에도 3~4개를 자연스럽게 넣는다.
+  - 억지로 어색하게 넣지 않는다. 어울리지 않으면 예비 단어로 바꾼다. 읽기 문제의 선택지는 탁음·장음·촉음처럼 헷갈리는 읽기로, 표기 문제의 오답은 모양이 비슷한 한자로 만든다.
+  - 현황은 `python scripts/exam_words.py --stats`. 오답노트 단어(`focus_words`)도 따로 2~3개 넣는다.
 - 기존 batch 파일과 기존 문제는 수정하지 않는다. 검증이 3번 고쳐도 통과하지 않으면 푸시하지 않는다.
 
 
