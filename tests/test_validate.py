@@ -119,11 +119,11 @@ class ValidateTest(unittest.TestCase):
         self.assertEqual(code, 1); self.assertIn("중복", out)
 
     def test_grammar_entry_is_required_for_grammar_questions(self):
-        # 정답 표현 「からして」는 문법 항목에 없으므로 오류. 항목이 있는 「にもかかわらず」는 통과
+        # 정답 표현 「ともかく」는 문법 항목에 없으므로 오류. 항목이 있는 「にもかかわらず」는 통과
         bad = good_grammar()
         bq = bad["questions"][0]
-        bq["choices"] = ["からして", "くせに", "ものの", "わりに"]
-        bq["full"] = "雨が降ったからして、試合は中止になった。"
+        bq["choices"] = ["ともかく", "くせに", "ものの", "わりに"]
+        bq["full"] = "雨が降ったともかく、試合は中止になった。"
         code, out = run([bad], grammar=True)
         self.assertEqual(code, 1); self.assertIn("grammar.json", out)
         ok = good_grammar("gr-902")

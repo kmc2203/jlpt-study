@@ -35,7 +35,7 @@ function hide() { if (bar) bar.hidden = true; current = ''; pinned = false; }
 
 export function refreshSelectionBar() {
   if (!bar || suspended) return;
-  if (document.body.dataset.route !== 'quiz') return hide();
+  if (document.body.dataset.route !== 'quiz' || document.body.dataset.nosel) return hide(); // 실전 모드에서는 단어 선택 불가
   const text = readSelection();
   if (text) {
     lastSelAt = Date.now();

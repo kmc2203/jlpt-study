@@ -85,7 +85,7 @@ export function grammarIndex(d, entries) {
   const hit = indexCache.get(d);
   if (hit && hit.entries === entries) return hit.map;
   const map = new Map(entries.map(e => [e.id, []]));
-  for (const item of d.items) {
+  for (const item of (d.all || d.items)) {
     item.questions.forEach((q, qi) => {
       for (const e of matchGrammar(entries, item, q).main) map.get(e.id)?.push({ item, qi });
     });
@@ -106,7 +106,7 @@ export function grammarStats(d, entries, progress, today) {
       const r = progress.done?.[item.id]?.res?.[qi];
       if (r === false) { wrong++; wrongItems.set(item.id, item); }
       else if (r === true) { right++; doneItems.set(item.id, item); }
-      else if (!progress.done?.[item.id]) freshItems.set(item.id, item);
+      else if (!progress.done?.[item.id] && !item.mock) freshItems.set(item.id, item);
     }
     // 새 문제는 이미 공개된 것 → 공개 전(더 풀기 영역) 순
     const fresh = [...freshItems.values()].sort((a, b) =>

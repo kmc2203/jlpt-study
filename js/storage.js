@@ -25,6 +25,8 @@ export const DEFAULTS = {
   cycle: () => null,
   reports: () => [],      // 문제 신고 [{id, qi, reason, memo, at}]
   kanjiLinks: () => ({}), // { 한자 한 글자: nihongokanji.com 페이지 주소 }
+  mocks: () => ({}),      // 실전모의고사 { id: 모의고사 JSON } — 이 기기에만 저장 (공개 저장소에 올리지 않음)
+  mockruns: () => ({}),   // 모의고사 진행 { id: { practice, exam, last } }
 };
 
 const cache = {};

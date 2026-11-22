@@ -22,6 +22,8 @@ export const TYPES = {
 export const LEVELS = ['N5', 'N4', 'N3', 'N2'];
 export const levelOf = item => (LEVELS.includes(item?.level) ? item.level : 'N2');
 
+import { load } from './storage.js';
+
 let cache;
 
 async function fetchJson(url) {
@@ -35,7 +37,11 @@ export async function loadData(force = false) {
   const man = await fetchJson('data/manifest.json');
   const batches = await Promise.all((man.batches || []).map(b => fetchJson('data/' + b)));
   const items = batches.flatMap(b => b.items || []);
-  cache = { man, items, byId: new Map(items.map(i => [i.id, i])), released: man.released || {} };
+  // 실전모의고사: 사용자가 가져온 파일(기기 저장)의 문제. 일일 출제·더 풀기·모의고사 풀에는 섞지 않고(items), 기록·복습·문법 통계용으로만(all, byId) 쓴다.
+  const mocks = Object.values(await load('mocks'));
+  const mockItems = mocks.flatMap(m => (m.items || []).map(i => ({ ...i, mock: m.id })));
+  const all = [...items, ...mockItems];
+  cache = { man, items, mockItems, all, byId: new Map(all.map(i => [i.id, i])), released: man.released || {} };
   return cache;
 }
 

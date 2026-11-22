@@ -11,6 +11,7 @@ import { recentlySelected } from './select.js';
 import { linkKanji } from './kanji.js';
 import { loadGrammar, grammarSection, grammarStats, buildGrammarReview, openGrammar } from './grammar.js';
 import { REPO } from './config.js';
+import { mockHomeCard, saveMockPractice, finishMockPractice } from './mock.js';
 
 let pendingDrill = null; // 통계 화면의 '이 유형 집중 풀기' 요청
 export const requestDrill = type => { pendingDrill = type; };
@@ -23,12 +24,13 @@ let examTimer = null;
 const stopTimer = () => { clearInterval(examTimer); examTimer = null; };
 
 const CIRCLED = ['①', '②', '③', '④', '⑤', '⑥'];
-const MODE_LABEL = { daily: '오늘의 문제', extra: '더 풀기', review: '틀린 문제 복습', gram: '문법 복습', gdrill: '문법 연습', drill: '집중 풀기', srs: '간격 복습', exam: '모의고사' };
+const MODE_LABEL = { daily: '오늘의 문제', extra: '더 풀기', review: '틀린 문제 복습', gram: '문법 복습', gdrill: '문법 연습', drill: '집중 풀기', srs: '간격 복습', exam: '모의고사', mock: '실전모의고사 연습' };
 const SQUASH = s => String(s ?? '').replace(/\[\[(.+?)\]\]/g, '$1').replace(/\{([^{}|]+)\|([^{}]+)\}/g, '$1').replace(/[\s　、。，,．.・「」『』]/g, '');
 
 /* ───────── 시작 화면 ───────── */
 export async function renderQuizHome(view) {
   stopTimer();
+  delete document.body.dataset.nosel;
   session = null;
   view.replaceChildren(h('div', { class: 'empty' }, '불러오는 중…'));
   let d;
@@ -105,6 +107,7 @@ export async function renderQuizHome(view) {
           const n = Number(examSel.value);
           start(buildExam(d, progress, n), 'exam', { limitMin: n });
         } }, '시작'))),
+    await mockHomeCard(d, () => renderQuizHome(view)),
     h('div', { class: 'card' },
       h('h2', {}, '더 풀기'),
       h('div', { class: 'sub' }, `시간이 많을 때 아직 공개되지 않은 새 문제를 미리 풀어요. (풀 남은 문제: ${unreleasedCount(d)}개)`),
@@ -118,6 +121,7 @@ export async function renderQuizHome(view) {
 }
 
 /* ───────── 세션 ───────── */
+export const startSession = (items, mode, opts) => start(items, mode, opts);
 async function start(items, mode, opts = {}) {
   if (!items.length) return toast('풀 문제가 없어요');
   stopTimer();
@@ -127,7 +131,15 @@ async function start(items, mode, opts = {}) {
     items, queue, pos: 0, mode, results: {}, answered: false,
     arrange: settings.arrange !== false && mode !== 'exam', // ★ 문제를 조각 배열로 풀기 (모의고사는 시험처럼 선택지)
     exam: mode === 'exam' ? { startedAt: Date.now(), deadline: Date.now() + (opts.limitMin || queue.length) * 60000 } : null,
+    mock: mode === 'mock' ? opts.mock : null, // 실전모의고사 연습: { id, title }
   };
+  if (session.mock) {
+    // 임시저장에서 이어 풀기: 이미 푼 문항은 건너뛰고 처음 안 푼 문항부터
+    session.results = structuredClone(opts.resume?.results || {});
+    const first = queue.findIndex(({ item, qi }) => typeof session.results[item.id]?.[qi] !== 'boolean');
+    if (first < 0) { renderResult(); return; }
+    session.pos = first;
+  }
   if (session.exam) {
     examTimer = setInterval(() => {
       const left = session.exam.deadline - Date.now();
@@ -139,11 +151,11 @@ async function start(items, mode, opts = {}) {
   renderQuestion();
 }
 
-const fmtClock = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+export const fmtClock = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const view = () => $('#view');
 const currentQ = () => { const { item, qi } = session.queue[session.pos]; return { item, qi, q: item.questions[qi] }; };
 
-function slotify(html) {
+export function slotify(html) {
   return html.replace(/＿{2,}/g, '<span class="slot">　　</span>').replace(/★/g, '<span class="slot star">★</span>');
 }
 
@@ -176,7 +188,7 @@ function renderQuestion() {
       h('span', { class: 'row' },
         session.exam ? h('span', { class: 'timer', id: 'examTimer' }, fmtClock(session.exam.deadline - Date.now())) : null,
         h('span', { class: 'sub' }, `${session.pos + 1} / ${session.queue.length}`),
-        h('button', { class: 'btn small', onclick: () => renderQuizHome(view()) }, '종료'))),
+        h('button', { class: 'btn small', onclick: () => renderQuizHome(view()) }, session.mock ? '임시저장 후 종료' : '종료'))),
     h('div', { class: 'progress' }, h('i', { style: `width:${pct}%` })),
     h('div', { class: 'card' },
       item.instruction ? h('div', { class: 'inst' }, item.instruction) : null,
@@ -263,6 +275,7 @@ async function settle(ok) {
   const { item, qi, q } = currentQ();
   (session.results[item.id] ||= [])[qi] = ok;
   await recordAnswer(item, qi, ok);
+  if (session.mock) await saveMockPractice(session.mock.id, session.results);
 
   if (session.exam) { setTimeout(() => { if (session && session.exam) next(); }, 250); return; }
 
@@ -275,7 +288,7 @@ async function settle(ok) {
   $('#exp').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-async function recordAnswer(item, qi, ok) {
+export async function recordAnswer(item, qi, ok, results = session.results) {
   const p = await load('progress');
   const s = (p.stats[item.type] ||= { n: 0, ok: 0 });
   s.n += 1; if (ok) s.ok += 1;
@@ -285,7 +298,7 @@ async function recordAnswer(item, qi, ok) {
   const day = todayStr();
   p.days[day] = (p.days[day] || 0) + 1;
   // 아이템의 모든 문항을 마치면 '푼 문제'로 기록 (다시 출제되지 않음)
-  const res = session.results[item.id] || [];
+  const res = results[item.id] || [];
   const complete = item.questions.every((_, k) => typeof res[k] === 'boolean');
   if (complete) {
     p.done[item.id] = { at: Date.now(), res: [...res] };
@@ -314,7 +327,7 @@ function next() {
 }
 
 /* ───────── 해설 ───────── */
-function buildExplanation(item, qi, q, ok) {
+export function buildExplanation(item, qi, q, ok) {
   const e = q.explanation || {};
   const card = h('div', { class: 'card exp' });
   card.append(h('div', { class: 'banner ' + (ok ? 'ok' : 'ng') },
@@ -444,10 +457,11 @@ function renderResult() {
   const mode = session.mode;
   const pct = Math.round((okN / all) * 100);
   const extra = [];
-  if (exam) extra.push(examReport(pct));
+  if (exam || mode === 'mock') extra.push(examReport(pct));
+  if (mode === 'mock') finishMockPractice(session.mock.id, okN, all);
   view().replaceChildren(
     h('div', { class: 'card' },
-      h('h2', {}, mode === 'exam' ? '모의고사 결과' : '수고했어요!'),
+      h('h2', {}, mode === 'exam' ? '모의고사 결과' : mode === 'mock' ? `${session.mock.title} 연습 결과` : '수고했어요!'),
       h('div', { class: 'big' }, `${okN} / ${all}`),
       h('div', { class: 'sub' }, `정답률 ${pct}%` + (exam ? ` · 걸린 시간 ${fmtClock(Math.min(Date.now(), exam.deadline) - exam.startedAt)}` : '')),
       wrongItems.length ? h('div', { class: 'notice', style: 'margin-top:10px' }, exam

@@ -6,8 +6,8 @@
     python scripts/exam_words.py --check    # 목록 형식 검사
 
 규칙
-- tier: top(최빈출) · predict(출제 예상) · freq(빈출). 최빈출·출제 예상을 적극적으로, 빈출은 적당히 쓰도록
-  고를 때 top → predict → top → predict → freq 순서로 돌려 뽑는다 (비율 약 2 : 2 : 1).
+- tier: top(최빈출) · predict(출제 예상) · freq(빈출) · mock(실전모의고사에 나온 단어). 최빈출·출제 예상을 적극적으로,
+  빈출·모의고사 단어는 적당히 쓰도록 고를 때 top → predict → top → predict → mock → freq 순서로 돌려 뽑는다 (비율 약 2 : 2 : 1 : 1).
 - 이미 문제(data/pool)에 나온 단어는 뒤로 미루고, 안 나온 단어부터 고른다. 목록을 다 돌면 다시 처음부터.
 - 한자 읽기(kanji_reading)에는 한자가 든 단어, 표기(orthography)에는 한자로 쓰는 단어(kind=hyoki 우선)를 쓴다.
 """
@@ -21,9 +21,9 @@ LIST = ROOT / "docs" / "exam_words.json"
 POOL = sorted((ROOT / "data" / "pool").glob("*.json"))
 KANJI = re.compile(r"[㐀-䶿一-鿿]")
 RUBY = re.compile(r"\{([^{}|]+)\|[^{}]+\}")
-TIERS = ("top", "predict", "freq")
-TIER_JA = {"top": "최빈출", "predict": "출제예상", "freq": "빈출"}
-PATTERN = ["top", "predict", "top", "predict", "freq"]
+TIERS = ("top", "predict", "freq", "mock")
+TIER_JA = {"top": "최빈출", "predict": "출제예상", "freq": "빈출", "mock": "모의고사"}
+PATTERN = ["top", "predict", "top", "predict", "mock", "freq"]
 
 
 def load_words():
@@ -40,7 +40,7 @@ def check(words):
         if w.get("kind") not in ("hyoki", "yomi"):
             errs.append(f"#{i} {w.get('w')}: kind 가 hyoki/yomi 가 아님")
         if w.get("tier") not in TIERS:
-            errs.append(f"#{i} {w.get('w')}: tier 가 top/predict/freq 가 아님")
+            errs.append(f"#{i} {w.get('w')}: tier 가 top/predict/freq/mock 이 아님")
         k = (w.get("kind"), w.get("w"), w.get("r"))
         if k in seen:
             errs.append(f"#{i} {w.get('w')}: 중복")

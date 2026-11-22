@@ -112,7 +112,7 @@ test('문제 풀이: 오늘의 문제 → 풀이 → 해설 → 결과, 푼 문�
   const reviewBtns = [...document.querySelectorAll('button')].filter(b => b.textContent.trim() === '복습 시작');
   assert.equal(reviewBtns.length, 3, '오늘의 복습 + 틀린 문법 복습 + 틀린 문제 복습');
   assert.ok(reviewBtns[0].disabled, '방금 틀린 문제의 간격 복습은 내일부터');
-  assert.ok(!reviewBtns[1].disabled, '틀린 문제 복습 가능');
+  assert.ok(!reviewBtns[2].disabled, '틀린 문제 복습 가능');
   const p2 = await load('progress');
   const { addDays } = await import('../js/util.js');
   assert.ok(Object.keys(p2.wrong).every(id => p2.srs[id]?.step === 0 && p2.srs[id].due === addDays(todayStr(), 1)), '틀린 문제는 하루 뒤 복습 일정');
@@ -867,4 +867,97 @@ test('틀린 문법 복습·문법 모아보기: 푼 기록에서 문법 상태�
   progress.done[first.id] = { at: 2, res: first.questions.map(() => true) };
   st = grammarStats(d, entries, progress, today).find(s => s.entry.id === target.id);
   assert.notEqual(st.status, 'weak');
+});
+
+const clickStarts = async pre => { const b = await waitFor(() => [...document.querySelectorAll('button')].find(x => x.textContent.trim().startsWith(pre)), `버튼 '${pre}…'`); b.click(); };
+
+/* ───────── 실전모의고사 (가상의 문제로 동작만 검증 — 실제 모의고사 문제는 저장소에 두지 않는다) ───────── */
+const FIX = {
+  app: 'jlpt-study-mock', version: 1, id: 'mock-t1', no: 1, title: 'T 모의고사 1회', minutes: 10,
+  items: [
+    { id: 'mt-01', type: 'kanji_reading', level: 'N2', instruction: 'テスト1', questions: [{ no: 1, stem: '[[山]]を見る。', choices: ['やま', 'かわ', 'うみ', 'そら'], answer: 0 }] },
+    { id: 'mt-02', type: 'grammar', level: 'N2', instruction: 'テスト2', questions: [{ no: 2, stem: '雨（　）降っても行く。', choices: ['が', 'に', 'が', 'を'], answer: 1 }] },
+    { id: 'mt-03', type: 'reading_short', level: 'N2', instruction: 'テスト3', passage: '短い文章です。', passage_translation: '짧은 글입니다.',
+      questions: [{ no: 3, stem: '何ですか。', choices: ['あ', 'い', 'う', 'え'], answer: 2 }, { no: 4, stem: '次は？', choices: ['あ', 'い', 'う', 'え'], answer: 3 }] },
+  ],
+};
+
+test('실전모의고사: 가져오기 → 연습 모드 임시저장·이어 풀기 → 기록 반영', { skip: !JSDOM }, async () => {
+  const { view } = await setup();
+  const { renderQuizHome } = await import('../js/quiz.js');
+  const { importMock } = await import('../js/mock.js');
+  const { load } = await import('../js/storage.js');
+  const { loadData } = await import('../js/data.js');
+  await assert.rejects(() => importMock('{"app":"x"}'), /모의고사 파일이 아니에요/);
+  await importMock(JSON.stringify(FIX));
+  const d = await loadData();
+  assert.equal(d.mockItems.length, 3);
+  assert.ok(!d.items.some(i => i.mock), '일일 문제·더 풀기 풀에는 섞이지 않는다');
+
+  await renderQuizHome(view);
+  assert.match(bodyText(), /실전모의고사/);
+  await clickStarts('1회차');
+  await clickBtn('연습 시작');
+  // 1번 문항: 정답, 그 다음 종료(임시저장)
+  const choices = await waitFor(() => { const c = [...document.querySelectorAll('.choice')]; return c.length === 4 ? c : null; }, '선택지');
+  choices[0].click();
+  await waitFor(() => document.querySelector('.banner'), '해설');
+  await clickBtn('임시저장 후 종료');
+  await waitFor(() => bodyText().includes('이어 풀기 가능'), '문제 홈');
+  let runs = await load('mockruns');
+  assert.equal(runs['mock-t1'].practice.results['mt-01'][0], true);
+  await clickStarts('1회차');
+  await clickBtn('이어 풀기 (1/4)');
+  await waitFor(() => document.querySelector('.stem')?.textContent.includes('雨'), '이어서 2번 문항');
+  assert.equal(document.body.dataset.nosel, undefined, '연습 모드에서는 단어 선택 가능');
+  // 나머지를 풀고(2번은 일부러 오답) 결과까지
+  for (const [pick, last] of [[0, false], [2, false], [3, true]]) {
+    const cs = await waitFor(() => { const c = [...document.querySelectorAll('.choice')]; return c.length === 4 && !document.querySelector('.banner') ? c : null; }, '선택지');
+    cs[pick].click();
+    await waitFor(() => document.querySelector('.banner'), '해설');
+    await clickBtn(last ? '결과 보기' : '다음 문제');
+  }
+  await waitFor(() => bodyText().includes('연습 결과'), '결과');
+  const p = await load('progress');
+  assert.ok(p.wrong['mt-02'], '틀린 문제가 저장됨');
+  assert.ok(p.done['mt-03'] && p.stats.grammar.n >= 1 && p.stats.reading_short.n === 2, '통계 반영');
+  runs = await load('mockruns');
+  assert.equal(runs['mock-t1'].practice, undefined);
+  assert.deepEqual([runs['mock-t1'].last.practice.ok, runs['mock-t1'].last.practice.total], [3, 4]);
+});
+
+test('실전모의고사: 실전 모드는 단어 선택 불가·임시저장(남은 시간)·제출 시 기록 반영', { skip: !JSDOM }, async () => {
+  const { view } = await setup();
+  const { renderQuizHome } = await import('../js/quiz.js');
+  const { importMock } = await import('../js/mock.js');
+  const { load } = await import('../js/storage.js');
+  await importMock(JSON.stringify(FIX));
+  await renderQuizHome(view);
+  await clickStarts('1회차');
+  await clickBtn('실전 시작');
+  await waitFor(() => document.querySelector('.mockexam'), '실전 화면');
+  assert.equal(document.body.dataset.nosel, '1', '실전 모드에서는 단어 선택이 막힘');
+  assert.ok(!bodyText().includes('단어 메모'), '해설·단어 메모 없음');
+  document.querySelectorAll('.choice')[0].click();           // 1번: 정답
+  await clickBtn('다음 →');
+  document.querySelectorAll('.choice')[2].click();           // 2번: 오답
+  await clickBtn('임시저장 후 종료');
+  await waitFor(() => bodyText().includes('이어 풀기 (남은'), '회차 화면');
+  let runs = await load('mockruns');
+  const sv = runs['mock-t1'].exam;
+  assert.deepEqual(sv.answers, { 1: 0, 2: 2 });
+  assert.ok(sv.left > 9 * 60000 && sv.left <= 10 * 60000, '남은 시간 저장');
+  assert.equal(document.body.dataset.nosel, undefined);
+  await clickStarts('이어 풀기 (남은');
+  await waitFor(() => document.querySelector('.mockexam'), '이어 풀기');
+  assert.match(bodyText(), /푼 문제 2\/4/);
+  await clickBtn('제출하고 채점');
+  await waitFor(() => bodyText().includes('실전 결과'), '결과');
+  const p = await load('progress');
+  assert.ok(p.wrong['mt-02'] && p.wrong['mt-03'], '틀린·안 푼 문제는 오답으로 저장');
+  assert.equal(p.done['mt-01'].res[0], true);
+  assert.equal(p.stats.reading_short.n, 2);
+  runs = await load('mockruns');
+  assert.equal(runs['mock-t1'].exam, undefined);
+  assert.equal(runs['mock-t1'].last.exam.ok, 1);
 });

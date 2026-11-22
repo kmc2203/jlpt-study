@@ -222,3 +222,17 @@ details summary{cursor:pointer;color:var(--pri);font-size:14px;padding:6px 0}
 .grow-row:last-child{border-bottom:0}
 .grow-row .gform{font-weight:700}
 .grow-row .gst{text-align:right;flex:none}
+
+/* 실전모의고사 */
+.mocklist{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.mockitem{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;padding:12px;border:1.5px solid var(--line);border-radius:12px;background:var(--card,#fff);font:inherit;color:inherit;cursor:pointer}
+.mockitem b{font-size:16px}
+.mockexam{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.timer.low{color:var(--ng)}
+.qgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:6px;margin-top:8px}
+.qcell{display:flex;align-items:center;justify-content:center;height:36px;border:1.5px solid var(--line);border-radius:8px;background:transparent;font:inherit;font-size:13px;color:inherit;cursor:pointer}
+.qcell.done{background:var(--ok-bg);border-color:var(--ok)}
+.qcell.cur{outline:2px solid var(--pri)}
+.qcell.mark::after{content:'★';font-size:9px;margin-left:1px;color:var(--pri)}
+.qcell.ok{background:var(--ok-bg);border-color:var(--ok)}
+.qcell.ng{background:var(--ng-bg);border-color:var(--ng)}
