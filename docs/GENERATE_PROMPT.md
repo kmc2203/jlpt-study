@@ -113,6 +113,7 @@ question = {
   - kanji_reading·orthography 의 정답 단어와 context·synonym·usage 의 핵심 단어는 추천 목록에서 고른다. grammar·sentence_order·독해 문장에도 3~4개를 자연스럽게 넣는다.
   - 억지로 어색하게 넣지 않는다. 어울리지 않으면 예비 단어로 바꾼다. 읽기 문제의 선택지는 탁음·장음·촉음처럼 헷갈리는 읽기로, 표기 문제의 오답은 모양이 비슷한 한자로 만든다.
   - 현황은 `python scripts/exam_words.py --stats`. 오답노트 단어(`focus_words`)도 따로 2~3개 넣는다.
+- **정답 번호 균형**: 문제를 만들 때는 정답을 습관적으로 1번에 두기 쉽다. batch 를 다 만든 뒤 검사 전에 `python3 scripts/balance_answers.py pool/batch-NNN.json` 을 한 번 실행해 선택지 순서를 섞는다(정답 번호 1~4가 전체에서 고르게 분포하도록 정답 위치를 재배치하고, choice_meanings·choices_ko 도 함께 옮긴다. sentence_order·info_search·숫자/A·B·C 선택지는 건드리지 않는다). 실행 후에는 선택지를 손으로 고치지 않는다.
 - 기존 batch 파일과 기존 문제는 수정하지 않는다. 검증이 3번 고쳐도 통과하지 않으면 푸시하지 않는다.
 
 
